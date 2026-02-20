@@ -1,3 +1,22 @@
+'''
+command for docker testing:
+
+docker run -it --rm \
+  --cap-add=NET_ADMIN \
+  --device=/dev/net/tun \
+  tailscale
+  bash -lc "git clone https://github.com/sevdentries/meshmilk.git"
+
+
+and final clone script
+
+git clone https://github.com/sevdentries/meshmilk.git
+'''
+
+
+
+
+
 import subprocess
 import shlex
 

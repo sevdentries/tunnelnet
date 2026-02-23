@@ -7,4 +7,5 @@ else
     echo "curl is not installed! installing..."
     apt update && apt install -y curl
     curl -fsSL https://tailscale.com/install.sh | sh
+fi
 echo "Yes this thing is working"

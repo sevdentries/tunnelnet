@@ -37,5 +37,22 @@ system = platform.system()#OS CHECK STARTS HERE, should return "Windows", "Linux
 #Nathan keep your code for the installscript inside an if statement checking variable system for OS thanks
 
 if system == "Linux":
-    pass
+    import subprocess
+    import shlex
+    from pathlib import Path
+
+    command_to_run = "echo \"hello is this thing working\""
+
+    args = "linuxinstall.sh"
+    parent = Path(__file__).resolve().parent
+    assemblepath = str(parent / args)
+    executable = f"sudo chmod +x {str(assemblepath)}"
+
+    try:
+        result = subprocess.run(f"{executable}", check=True, capture_output=True, text=True, shell=True)
+        result = subprocess.run(f"sudo bash {assemblepath}", check=True, capture_output=True, text=True, shell=True)
+        print(result.stdout)
+    except subprocess.CalledProcessError as err:
+        print("STDERR:", err.stderr)
+
 

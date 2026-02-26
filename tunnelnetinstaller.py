@@ -35,13 +35,10 @@ import platform
 system = platform.system()#OS CHECK STARTS HERE, should return "Windows", "Linux", or "Darwin" for MacOS.
 #see official python documentation if confused.
 #Nathan keep your code for the installscript inside an if statement checking variable system for OS thanks
-
+print("Hello, World!")
 if system == "Linux":
     import subprocess
-    import shlex
     from pathlib import Path
-
-    command_to_run = "echo \"hello is this thing working\""
 
     args = "linuxinstall.sh"
     parent = Path(__file__).resolve().parent

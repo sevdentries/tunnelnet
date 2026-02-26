@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+#things needed: pip, curl, tailscale installation
+#MUST BE RUN AS ROOT!
 set -e
 echo "tailscale install started"
 if command -v curl >/dev/null 2>&1; then
@@ -8,4 +10,5 @@ else
     apt update && apt install -y curl
     curl -fsSL https://tailscale.com/install.sh | sh
 fi
-echo "Yes this thing is working"
+tailscale set --operator=$USER
+echo "tailscale installed."

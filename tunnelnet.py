@@ -3,6 +3,7 @@ import requests
 import shlex
 import subprocess
 import threading
+import queue
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk
@@ -18,6 +19,52 @@ APIKEY = ""
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
 
+def bash_worker():
+    while True:
+        cmd = cmd_queue.get()
+        if cmd is None:
+            break
+        try:
+            args = shlex.split(cmd)
+            result = subprocess.run(args, capture_output=True, text=True)
+            if result.returncode == 0:
+                print(result.stdout)
+            else:
+                print("EXIT:", result.returncode)
+                print(result.stdout)
+                print("ERR:", result.stderr)
+
+        except Exception as e:
+            print("Worker error:", e)
+        cmd_queue.task_done()
+
+def requesttoken(cid, cs):
+    token_url = "https://api.tailscale.com/api/v2/oauth/token"
+    response = requests.post(
+        token_url,
+        data={"grant_type": "client_credentials"},
+        auth=(cid, cs),
+    )
+    AKEY = response.json()["access_token"]
+    print("key requested: "+AKEY)
+    return AKEY
+    
+def listdevices(apikey, tailnet = "-"):
+    token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
+    response = requests.get(
+        token_url,
+        headers= {'Authorization':f"Bearer {apikey}"}
+    )
+    print(response)
+    print(response.json())
+
+def getkeystatus(apikey):
+    pass
+
+
+cmd_queue = queue.Queue()
+thread = threading.Thread(target=bash_worker, daemon=True)
+thread.start()
 
 if system == "Linux":
     root = Tk()

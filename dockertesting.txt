@@ -19,7 +19,8 @@ RUN apt update && apt install -y \
     iproute2 \
     ca-certificates \
     git \
-    sudo
+    sudo \
+    systemctl
 
 CMD ["bash"]
 

@@ -10,5 +10,7 @@ else
     apt update && apt install -y curl
     curl -fsSL https://tailscale.com/install.sh | sh
 fi
-tailscale set --operator=$USER
+#tailscale set --operator=$USER
+systemctl start tailscaled
+systemctl status tailscaled
 echo "tailscale installed."

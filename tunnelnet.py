@@ -2,6 +2,7 @@ import platform
 import requests
 import shlex
 import subprocess
+import threading
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk

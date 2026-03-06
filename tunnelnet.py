@@ -27,6 +27,13 @@ def login():
     else:
         status = requesttoken(CLIENTID, CLIENTSECRET)
         print(status)
+        if status == 200:
+            try:
+                with open("/Assets/usersave.txt", "w") as dingus2:
+                    dingus2.write(loginentry.get())
+                    print("saved id: "+loginentry.get)
+            except Exception as err:
+                print("Error: "+err)
         logassemble = f"sudo tailscale up --auth-key={CLIENTSECRET}"
         cmd_queue.put(logassemble)
 
@@ -49,6 +56,8 @@ def bash_worker():
             print("Worker error:", e)
         cmd_queue.task_done()
 
+
+
 def requesttoken(cid, cs):
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
     response = requests.post(
@@ -59,7 +68,8 @@ def requesttoken(cid, cs):
     AKEY = response.json()["access_token"]
     print("key requested: "+AKEY)
     return response.status_code
-    
+
+
 def listdevices(apikey, tailnet = "-"):
     token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
     response = requests.get(
@@ -107,5 +117,16 @@ if system == "Linux":
     passlabel.grid(column=1, row=3, sticky=NSEW)
     passentry.grid(column=1, row=4, sticky=EW)
     loginbutton.grid(column=1, row=5, sticky=NSEW)
+
+    try:
+        with open("/Assets/usersave.txt", "r", encoding="utf-8") as dingus:
+            usersave = dingus.read()
+            if usersave == "":
+                print("Nothing found in usersave, skipping...")
+            else:
+                loginentry.insert(0, usersave)
+    except FileNotFoundError:
+        print("usersave file not found, program confused. skipping...")
+    exc
 
 root.mainloop()

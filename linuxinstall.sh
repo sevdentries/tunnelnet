@@ -10,6 +10,7 @@ else
     apt update && apt install -y curl
     curl -fsSL https://tailscale.com/install.sh | sh
 fi
+apt install -y python3-requests 
 #tailscale set --operator=$USER
 systemctl start tailscaled
 systemctl status tailscaled

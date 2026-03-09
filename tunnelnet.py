@@ -4,9 +4,12 @@ import shlex
 import subprocess
 import threading
 import queue
+from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk
+
+userdir = Path(__file__).resolve()
 
 system = platform.system()#OS CHECK STARTS HERE, should return "Windows", "Linux", or "Darwin" for MacOS.
 #see official python documentation if confused.
@@ -15,11 +18,13 @@ CLIENTSECRET = ""
 CLIENTID = ""
 APIKEY = ""
 TAILNET = ""
+USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
 #tunnelnet should only save the clientID and clientSecret. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
 def login():
+    global APIKEY,CLIENTID,CLIENTSECRET
     CLIENTID = loginentry.get()
     CLIENTSECRET = passentry.get()
     if CLIENTID == "" or CLIENTSECRET == "":
@@ -29,12 +34,12 @@ def login():
         print(status)
         if status == 200:
             try:
-                with open("/Assets/usersave.txt", "w") as dingus2:
-                    dingus2.write(loginentry.get())
-                    print("saved id: "+loginentry.get)
+                with open(USERSAVEDIR, "w") as dingus2:
+                    dingus2.write(CLIENTID)
+                    print("saved id")
             except Exception as err:
-                print("Error: "+err)
-        logassemble = f"sudo tailscale up --auth-key={CLIENTSECRET}"
+                print(err)
+        logassemble = f"sudo tailscale up --auth-key={APIKEY}"
         cmd_queue.put(logassemble)
 
 def bash_worker():
@@ -59,14 +64,15 @@ def bash_worker():
 
 
 def requesttoken(cid, cs):
+    global APIKEY,CLIENTID,CLIENTSECRET
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
     response = requests.post(
         token_url,
         data={"grant_type": "client_credentials"},
         auth=(cid, cs),
     )
-    AKEY = response.json()["access_token"]
-    print("key requested: "+AKEY)
+    APIKEY = response.json()["access_token"]
+    print("key requested: "+APIKEY)
     return response.status_code
 
 
@@ -89,7 +95,7 @@ thread.start()
 
 if system == "Linux":
     root = Tk()
-    root.geometry("600x400+200+200")
+    root.geometry("300x150+200+200")
     root.title("tunnelNET: Login")
 
     root.columnconfigure(0, weight=1)
@@ -119,7 +125,7 @@ if system == "Linux":
     loginbutton.grid(column=1, row=5, sticky=NSEW)
 
     try:
-        with open("/Assets/usersave.txt", "r", encoding="utf-8") as dingus:
+        with open(USERSAVEDIR, encoding="utf-8") as dingus:
             usersave = dingus.read()
             if usersave == "":
                 print("Nothing found in usersave, skipping...")
@@ -127,6 +133,6 @@ if system == "Linux":
                 loginentry.insert(0, usersave)
     except FileNotFoundError:
         print("usersave file not found, program confused. skipping...")
-    exc
-
+    except Exception as error:
+        print(error)
 root.mainloop()

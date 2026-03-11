@@ -1,6 +1,7 @@
 from tkinter import *
 from urllib.request import urlopen
 from PIL import Image, ImageTk
+from io import BytesIO
 import webbrowser
 import os
 
@@ -36,21 +37,26 @@ img1link = "https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/f
 
 try:
     with urlopen(img1link) as image:
-        img1data = image.read() 
+        img1data = BytesIO(image.read())
 except Exception as lerror: 
     print("Fetch logo failed", str(lerror))
 
-img1 = PhotoImage(data=img1data)
-img1label = Label(root, image=img1, bg='lightgray')
-img1label.grid(column=0, row=0)
+resized_img1 = Image.open(img1data)
+resized_img1 = resized_img1.resize((1470, 478))
+
+img1 = ImageTk.PhotoImage(resized_img1)
+
+img1label = Label(image=img1, bg='lightgray')
+img1label.image = img1  # Required to prevent image from being garbage collected
+img1label.grid(column=0, row=0, sticky='n')
 
 label = Label(root, text='Type something', bg='lightgray')
-label.grid(column=0, row=1)
+label.grid(column=0, row=1, sticky='n')
 
 txtbox = Entry(root, width=10)
-txtbox.grid(column=0, row=2)
+txtbox.grid(column=0, row=2, sticky='n')
 
 startbtn = Button(root, text='Start', command=onClick)
-startbtn.grid(column=0, row=3)
+startbtn.grid(column=0, row=3, sticky='n')
 
 root.mainloop()

@@ -47,7 +47,6 @@ resized_img1 = resized_img1.resize((1470, 478))
 img1 = ImageTk.PhotoImage(resized_img1)
 
 img1label = Label(image=img1, bg='lightgray')
-img1label.image = img1  # Required to prevent image from being garbage collected
 img1label.grid(column=0, row=0, sticky='n')
 
 label = Label(root, text='Type something', bg='lightgray')

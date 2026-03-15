@@ -20,10 +20,13 @@ def onClick():
     message.configure(text = result)
 
 # Image loading
-bgimglink = "https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/asset/computerBackground.png"
+bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Asset/computerBackground.png'
+logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Asset/tunnel.png'
 try:
-    with urlopen(bgimglink) as image:
-        img1data = BytesIO(image.read())
+    with urlopen(bgimglink) as img1:
+        bgimgdata = BytesIO(img1.read())
+    with urlopen(logoimglink) as img2:
+        logoimgdata = BytesIO(img2.read())
 except Exception as lerror: 
     print("Fetch logo failed", str(lerror))
 
@@ -40,9 +43,12 @@ root.rowconfigure(1, weight=1) # only row 1 can fill
 root.rowconfigure(0, weight=0)
 
 # Images variables
-resized_bgimg = Image.open(img1data)
+resized_bgimg = Image.open(bgimgdata)
 resized_bgimg = resized_bgimg.resize((1470, 200))
+resized_logoimg = Image.open(logoimgdata)
+resized_logoimg = resized_logoimg.resize((100, 100))
 bgimg = ImageTk.PhotoImage(resized_bgimg)
+logoimg = ImageTk.PhotoImage(resized_logoimg)
 
 # Images
 bgimglabel = tk.Label(image=bgimg, bg='lightgray', border=0)
@@ -51,7 +57,14 @@ bgimglabel.grid(column=0, row=0, sticky='n')
 # Profile frame (all of left) 
 profileframe = tk.Frame(root, bg=PROFILEBG, width=367.5)
 profileframe.grid(column=0, row=1, sticky='wns')
+profileframe.grid_columnconfigure(0, weight=0)
+profileframe.grid_columnconfigure(1, weight=1)
+profileframe.grid_rowconfigure(0, weight=0)
+profileframe.grid_rowconfigure(1, weight=1)
 profileframe.grid_propagate(False) # stops frame from disappearing
+
+logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
+logoimglabel.grid(column=0, row=0, padx=20, pady=20)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(root, bg=CHATBG, width=1102.5)

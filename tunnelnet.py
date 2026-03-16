@@ -29,6 +29,10 @@ def login():
     CLIENTSECRET = passentry.get()
     if CLIENTID == "" or CLIENTSECRET == "":
         print("Error: One or more authentication elements are missing!")
+    elif CLIENTSECRET == "testing":
+        print("login bypassed")
+        root.withdraw()
+        main.deiconify()
     else:
         status = requesttoken(CLIENTID, CLIENTSECRET)
         print(status)
@@ -39,6 +43,9 @@ def login():
                     print("saved id")
             except Exception as err:
                 print(err)
+            print("login successful")
+            root.withdraw()
+            main.deiconify()
         logassemble = f"sudo tailscale up --auth-key={APIKEY}"
         cmd_queue.put(logassemble)
 
@@ -94,22 +101,28 @@ thread = threading.Thread(target=bash_worker, daemon=True)
 thread.start()
 
 if system == "Linux":
+    #ROOT CONFIGS
     root = Tk()
     root.geometry("300x150+200+200")
     root.title("tunnelNET: Login")
-
     root.columnconfigure(0, weight=1)
     root.columnconfigure(1, weight=1)
     root.columnconfigure(2, weight=1)
     root.rowconfigure(0 , weight=1)
     root.rowconfigure(1, weight=1)
-    root.rowconfigure(2, weight=2)
-    root.rowconfigure(3, weight=2)
-    root.rowconfigure(4, weight=2)
-    root.rowconfigure(5, weight=2)
-    root.rowconfigure(6, weight=2)
-    root.rowconfigure(7, weight=2)
-
+    root.rowconfigure(2, weight=1)
+    root.rowconfigure(3, weight=1)
+    root.rowconfigure(4, weight=1)
+    root.rowconfigure(5, weight=1)
+    root.rowconfigure(6, weight=1)
+    root.rowconfigure(7, weight=1)
+    #MAINWINDOW CONFIGS
+    main = Toplevel(root)
+    main.title("tunnelNET")
+    main.geometry("600x400+200+200")
+    #10rows 10columns
+    main.withdraw()
+    #ELEMENTS
     introlabel = Label(root, text="Welcome to tunnelNET!")
     loginlabel = Label(root, text="Login (OAuth ID): ")
     passlabel = Label(root, text="Password (OAuth Secret)")

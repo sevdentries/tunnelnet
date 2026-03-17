@@ -1,36 +1,4 @@
-'''
-command for docker testing:
 
-docker run -it --rm \
-  --cap-add=NET_ADMIN \
-  --device=/dev/net/tun \
-  -v "$(pwd)":/workspace \
-  tailscale
-  bash -lc "cd workspace/Documents/GitHub/meshmilk"
-
-Dockerfile:
-
-FROM ubuntu:24.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt update && apt install -y \
-    python3 \
-    python3-pip \
-    curl \
-    iproute2 \
-    ca-certificates \
-    git \
-    sudo
-
-CMD ["bash"]
-
-build using docker build -t (NAME) (PATH towards Dockerfile)
-
-and final clone script
-
-git clone https://github.com/sevdentries/meshmilk.git
-'''
 import platform 
 system = platform.system()#OS CHECK STARTS HERE, should return "Windows", "Linux", or "Darwin" for MacOS.
 #see official python documentation if confused.

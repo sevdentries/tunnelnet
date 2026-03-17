@@ -105,30 +105,53 @@ if system == "Linux":
     root = Tk()
     root.geometry("300x150+200+200")
     root.title("tunnelNET: Login")
-    root.columnconfigure(0, weight=1)
-    root.columnconfigure(1, weight=1)
-    root.columnconfigure(2, weight=1)
-    root.rowconfigure(0 , weight=1)
-    root.rowconfigure(1, weight=1)
-    root.rowconfigure(2, weight=1)
-    root.rowconfigure(3, weight=1)
-    root.rowconfigure(4, weight=1)
-    root.rowconfigure(5, weight=1)
-    root.rowconfigure(6, weight=1)
-    root.rowconfigure(7, weight=1)
+    root.resizable(False,False)
+    for acol in range(3):
+        root.columnconfigure(acol, weight=1)
+    for brow in range(8):
+        root.rowconfigure(brow, weight=1)
+
     #MAINWINDOW CONFIGS
     main = Toplevel(root)
     main.title("tunnelNET")
     main.geometry("600x400+200+200")
     #10rows 10columns
+    for rwcl in range(10):
+        main.rowconfigure(rwcl, weight=1)
+        main.columnconfigure(rwcl, weight=1)
+        
     main.withdraw()
     #ELEMENTS
-    introlabel = Label(root, text="Welcome to tunnelNET!")
-    loginlabel = Label(root, text="Login (OAuth ID): ")
-    passlabel = Label(root, text="Password (OAuth Secret)")
-    loginentry = Entry(root)
-    passentry = Entry(root)
-    loginbutton = Button(root, text="Login", command=login)
+    initialize = ttk.Notebook(root)
+
+    jointab = Frame(initialize)
+    joinlabel = Label(jointab, text="Welcome to tunnelNET!")
+    joinlabel2 = Label(jointab, text="Please enter your join key (tskey-auth):")
+    joinentry = Entry(jointab)
+    joinbutton = Button(jointab, text="Connect", command=lambda:print("yeah yeah ill work on this later"))
+
+    joinlabel.grid(column=1, row=0 ,sticky=NSEW)
+    joinlabel2.grid(column=1, row=1 ,sticky=NSEW)
+    joinentry.grid(column=1, row=2 ,sticky=EW)
+    joinbutton.grid(column=1, row=3 ,sticky=NSEW)
+
+    logintab = Frame(initialize)
+    introlabel = Label(logintab, text="Welcome to tunnelNET!")
+    loginlabel = Label(logintab, text="Login (OAuth ID): ")
+    passlabel = Label(logintab, text="Password (OAuth Secret)")
+    loginentry = Entry(logintab)
+    passentry = Entry(logintab)
+    loginbutton = Button(logintab, text="Login", command=login)
+
+    for bcol in range(3):
+        logintab.columnconfigure(bcol, weight=1)
+        jointab.columnconfigure(bcol, weight=1)
+    for crow in range(8):
+        logintab.rowconfigure(crow, weight=1)
+        jointab.rowconfigure(crow, weight=1)
+
+    initialize.add(logintab, text="Login")
+    initialize.add(jointab, text="Join")
 
     introlabel.grid(column=1, row=0 ,sticky=NSEW)
     loginlabel.grid(column=1, row=1, sticky = NSEW)
@@ -136,6 +159,8 @@ if system == "Linux":
     passlabel.grid(column=1, row=3, sticky=NSEW)
     passentry.grid(column=1, row=4, sticky=EW)
     loginbutton.grid(column=1, row=5, sticky=NSEW)
+
+    initialize.grid(row=0,column=0,rowspan=8,columnspan=3, sticky=NSEW)
 
     try:
         with open(USERSAVEDIR, encoding="utf-8") as dingus:

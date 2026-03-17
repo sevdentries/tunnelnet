@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 from urllib.request import urlopen
-from PIL import Image, ImageTk
-from io import BytesIO
 import webbrowser
 import os
 
@@ -24,11 +22,11 @@ bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/
 logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Asset/tunnel.png'
 try:
     with urlopen(bgimglink) as img1:
-        bgimgdata = BytesIO(img1.read())
+        bgimgraw = img1.read()
     with urlopen(logoimglink) as img2:
-        logoimgdata = BytesIO(img2.read())
-except Exception as lerror: 
-    print("Fetch logo failed", str(lerror))
+        logoimgraw = img2.read()
+except Exception as linkerror: 
+    print("Fetch logo failed", str(linkerror))
 
 # Root start
 root = tk.Tk()
@@ -43,12 +41,14 @@ root.rowconfigure(1, weight=1) # only row 1 can fill
 root.rowconfigure(0, weight=0)
 
 # Images variables
-resized_bgimg = Image.open(bgimgdata)
-resized_bgimg = resized_bgimg.resize((1470, 200))
-resized_logoimg = Image.open(logoimgdata)
-resized_logoimg = resized_logoimg.resize((100, 100))
-bgimg = ImageTk.PhotoImage(resized_bgimg)
-logoimg = ImageTk.PhotoImage(resized_logoimg)
+
+bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
+bgimg = bgimgdata.zoom(1,5)
+bgimg = bgimgdata.subsample(1,6)
+# bgimg = tk.PhotoImage(file='link') # code for file with correct dimensions.
+
+logoimgdata = tk.PhotoImage(data=logoimgraw)
+logoimg = logoimgdata.subsample(5,5)
 
 # Images
 bgimglabel = tk.Label(image=bgimg, bg='lightgray', border=0)
@@ -83,7 +83,7 @@ textbox.grid(column=0, row=0, sticky='es', padx = (5, 5), pady=10)
 sendbtn = tk.Button(inputframe, text='Send', bg=TEXTBG, fg=TEXTBG, command=onClick)
 sendbtn.grid(column=1, row=0, pady=10, padx=(0,5))
 
-# temporary testing code
+# Temporary testing code
 message = tk.Label(mainchatframe, text='Send a message to update me!', bg='blue', fg='white')
 message.grid(column=0, row=0)
 

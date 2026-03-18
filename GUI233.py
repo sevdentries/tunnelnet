@@ -33,17 +33,17 @@ try:
 except Exception as linkerror: 
     print("Fetch logo failed", str(linkerror))
 
-# Root start
-root = tk.Tk()
-root.geometry('1470x956')
-root.title('Tunnelnet')
-root.configure(bg="lightgray")
-root.columnconfigure(2, weight=1)
-root.columnconfigure(1, weight=1)
-root.columnconfigure(0, weight=1)
-root.rowconfigure(2, weight=0)
-root.rowconfigure(1, weight=1) # only row 1 can fill 
-root.rowconfigure(0, weight=0)
+# main start
+main = tk.Tk()
+main.geometry('1470x956')
+main.title('Tunnelnet')
+main.configure(bg="lightgray")
+main.columnconfigure(2, weight=1)
+main.columnconfigure(1, weight=1)
+main.columnconfigure(0, weight=1)
+main.rowconfigure(2, weight=0)
+main.rowconfigure(1, weight=1) # only row 1 can fill 
+main.rowconfigure(0, weight=0)
 
 # Images variables
 bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
@@ -59,7 +59,7 @@ bgimglabel = tk.Label(image=bgimg, bg='lightgray', border=0)
 bgimglabel.grid(column=0, row=0, sticky='n')
 
 # Profile frame (all of left) 
-profileframe = tk.Frame(root, bg=PROFILEBG, width=367.5)
+profileframe = tk.Frame(main, bg=PROFILEBG, width=367.5)
 profileframe.grid(column=0, row=1, sticky='wns')
 profileframe.grid_columnconfigure(0, weight=0)
 profileframe.grid_columnconfigure(1, weight=1)
@@ -71,7 +71,7 @@ logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
 logoimglabel.grid(column=0, row=0, padx=20, pady=20)
 
 # Chat frame (all of right) 
-mainchatframe = tk.Frame(root, bg=CHATBG, width=1102.5)
+mainchatframe = tk.Frame(main, bg=CHATBG, width=1102.5)
 mainchatframe.grid(column=0, row=1, sticky='ens')
 mainchatframe.rowconfigure(0, weight=1) # for the chat (fills to fit)
 mainchatframe.rowconfigure(1, weight=0) # for the inputframe (fixed width)
@@ -111,4 +111,4 @@ sendbtn.grid(column=1, row=0, pady=10, padx=(0,5))
 # Temporary testing code
 # N/A
 
-root.mainloop()
+main.mainloop()

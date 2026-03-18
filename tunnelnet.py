@@ -21,8 +21,10 @@ CLIENTSECRET = ""
 CLIENTID = ""
 APIKEY = ""
 TAILNET = ""
+AUTH = ""
+STDOUT = ""
 USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
-#tunnelnet should only save the clientID and clientSecret. APIKEY cannot be saved and 
+#tunnelnet should only save the clientID. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
@@ -39,7 +41,8 @@ def login():
     else:
         status = requesttoken(CLIENTID, CLIENTSECRET)
         print(status)
-        if status == 200:
+        status2 = authkey(APIKEY)
+        if status == 200 and status2 == 200:
             try:
                 with open(USERSAVEDIR, "w") as dingus2:
                     dingus2.write(CLIENTID)
@@ -49,10 +52,11 @@ def login():
             print("login successful")
             root.withdraw()
             main.deiconify()
-        logassemble = f"sudo tailscale up --auth-key={APIKEY}"
+        logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
 
 def bash_worker():
+    global STDOUT
     while True:
         cmd = cmd_queue.get()
         if cmd is None:
@@ -61,10 +65,10 @@ def bash_worker():
             args = shlex.split(cmd)
             result = subprocess.run(args, capture_output=True, text=True)
             if result.returncode == 0:
-                print(result.stdout)
+                STDOUT = result.stdout
             else:
                 print("EXIT:", result.returncode)
-                print(result.stdout)
+                STDOUT = result.stdout
                 print("ERR:", result.stderr)
 
         except Exception as e:
@@ -94,6 +98,32 @@ def listdevices(apikey, tailnet = "-"):
     )
     print(response)
     print(response.json())
+
+def authkey(apikey, tailnet = "-"):
+    global AUTH
+    token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/keys"
+    response = requests.post(
+        token_url,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer "+apikey
+        },
+        json={
+            "description": "hi there",
+            "capabilities": {"devices":{"create":{
+                "reusable": False,
+                "ephemeral": False,
+                "preauthorized": True,
+                "tags": ["tag:client"]
+            }}},
+            "expirySeconds": 86400
+        }
+    )
+    print(response)
+    AUTH = (response.json())["key"]
+    print("auth: "+AUTH)
+    return response.status_code
+
 
 def getkeystatus(apikey):
     pass

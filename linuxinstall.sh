@@ -14,4 +14,5 @@ apt install -y python3-requests
 systemctl start tailscaled
 systemctl status tailscaled
 tailscale set --operator=$USER
+pip install requests
 echo "tailscale installed."

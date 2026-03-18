@@ -55,6 +55,11 @@ def login():
         logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
 
+def join():
+    global AUTH
+    AUTH = joinentry.get()
+    cmd_queue.put(f"tailscale up --auth-key={AUTH}")
+
 def bash_worker():
     global STDOUT
     while True:
@@ -256,7 +261,7 @@ jointab = Frame(initialize)
 joinlabel = Label(jointab, text="Welcome to tunnelNET!")
 joinlabel2 = Label(jointab, text="Please enter your join key (tskey-auth):")
 joinentry = Entry(jointab)
-joinbutton = Button(jointab, text="Connect", command=lambda:warnings.warn("yeah yeah ill work on this later"))
+joinbutton = Button(jointab, text="Connect", command=join)
 
 joinlabel.grid(column=1, row=0 ,sticky=NSEW)
 joinlabel2.grid(column=1, row=1 ,sticky=NSEW)

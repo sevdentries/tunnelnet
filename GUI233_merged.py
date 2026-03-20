@@ -35,74 +35,78 @@ except Exception as linkerror:
 
 # main start
 main = tk.Tk()
-main.geometry('600x400+100+100')
+main.geometry('1470x956')
 main.title('Tunnelnet')
 main.configure(bg="lightgray")
-main.columnconfigure(1, weight=2) # for mainchat
-main.columnconfigure(0, weight=1) # for profile
-main.rowconfigure(1, weight=20) # for chat
-main.rowconfigure(0, weight=1) # for computer background image
+main.columnconfigure(2, weight=1)
+main.columnconfigure(1, weight=1)
+main.columnconfigure(0, weight=1)
+main.rowconfigure(2, weight=0)
+main.rowconfigure(1, weight=1) # only row 1 can fill 
+main.rowconfigure(0, weight=0)
 
 # Images variables
 bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
-bgimg = bgimgdata.zoom(1,1)
-bgimg = bgimgdata.subsample(1,5)
+bgimg = bgimgdata.zoom(1,5)
+bgimg = bgimgdata.subsample(1,6)
 # bgimg = tk.PhotoImage(file='link') # code for file with correct dimensions.
 
 logoimgdata = tk.PhotoImage(data=logoimgraw)
 logoimg = logoimgdata.subsample(5,5)
 
 # Background Image
-bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
-bgimglabel.grid(column = 0, row=0, columnspan=2, sticky='nsew')
+bgimglabel = tk.Label(image=bgimg, bg='lightgray', border=0)
+bgimglabel.grid(column=0, row=0, sticky='n')
 
 # Profile frame (all of left) 
-profileframe = tk.Frame(main, bg=PROFILEBG)
-profileframe.grid(column=0, row=1, sticky='nsew')
+profileframe = tk.Frame(main, bg=PROFILEBG, width=367.5)
+profileframe.grid(column=0, row=1, sticky='wns')
 profileframe.grid_columnconfigure(0, weight=0)
 profileframe.grid_columnconfigure(1, weight=1)
 profileframe.grid_rowconfigure(0, weight=0)
 profileframe.grid_rowconfigure(1, weight=1)
+profileframe.grid_propagate(False) # stops frame from disappearing
 
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
 logoimglabel.grid(column=0, row=0, padx=20, pady=20)
 
 # Chat frame (all of right) 
-mainchatframe = tk.Frame(main, bg=CHATBG)
-mainchatframe.grid(column=1, row=1, sticky='nsew')
-mainchatframe.columnconfigure(0, weight=1)
-mainchatframe.columnconfigure(1, weight=1)
-mainchatframe.rowconfigure(0, weight=1) # for the chat to fill
-mainchatframe.rowconfigure(1, weight=0) # for the inputframe to remain same size
+mainchatframe = tk.Frame(main, bg=CHATBG, width=1102.5)
+mainchatframe.grid(column=0, row=1, sticky='ens')
+mainchatframe.rowconfigure(0, weight=1) # for the chat (fills to fit)
+mainchatframe.rowconfigure(1, weight=0) # for the inputframe (fixed width)
+mainchatframe.grid_propagate(False) # stops frame from disappearing
 
 # Chat frame notebook
 chattab = ttk.Notebook(mainchatframe)
+chattab.grid_propagate(False)
 
-chatframe1 = tk.Frame(chattab)
-chatframe2 = tk.Frame(chattab)
-chatframe3 = tk.Frame(chattab)
+chatframe1 = tk.Frame(chattab, width=750, height=500)
+chatframe2 = tk.Frame(chattab, width=750, height=500)
+chatframe3 = tk.Frame(chattab, width=750, height=500)
 chatframe1.grid_columnconfigure(0, weight=1)
 chatframe2.grid_columnconfigure(0, weight=1)
 chatframe3.grid_columnconfigure(0, weight=1)
+chatframe1.grid_propagate(False)
+chatframe2.grid_propagate(False)
+chatframe3.grid_propagate(False)
 
 chattab.add(chatframe1, text="F1")
 chattab.add(chatframe2, text="F2")
 chattab.add(chatframe3, text="F3")
-chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)
+
+chattab.grid(column=0, row=0)
 
 # Input frame (bottom-right) 
-inputframe = tk.Frame(mainchatframe, bg=TEXTBG)
-inputframe.columnconfigure(0, weight=1)
-inputframe.columnconfigure(1, weight=0)
-inputframe.rowconfigure(0, weight=1)
-inputframe.grid(column=0, row=1, columnspan=2, sticky='nsew')
+inputframe = tk.Frame(mainchatframe, bg=TEXTBG, width=1102.5, height=20)
+inputframe.grid(column=0, row=1, sticky='es')
 
 # Textbox and send button
-textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectforeground=TEXTBG, fg='white')
-textbox.grid(column=0, row=0, sticky='ew', padx=5, pady=10)
+textbox = tk.Entry(inputframe, width=112, bg=TEXTBG, insertbackground='white', selectforeground=TEXTBG, fg='white')
+textbox.grid(column=0, row=0, sticky='es', padx = (5, 5), pady=10)
 textbox.bind("<Return>", lambda event:sendMessage()) # allows pressing enter to chat
 sendbtn = tk.Button(inputframe, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage)
-sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
+sendbtn.grid(column=1, row=0, pady=10, padx=(0,5))
 
 # Temporary testing code
 # N/A

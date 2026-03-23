@@ -6,11 +6,13 @@ import threading
 import queue
 import warnings
 import webbrowser
+import sys
 from urllib.request import urlopen
 from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk
+import pexpect
 
 userdir = Path(__file__).resolve()
 
@@ -23,12 +25,15 @@ APIKEY = ""
 TAILNET = ""
 AUTH = ""
 STDOUT = ""
+SUDO = ""
 USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
 #tunnelnet should only save the clientID. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
-def login():
+inject = pexpect.spawn("/bin/bash", encoding="utf-8")
+inject.logfile = sys.stdout
+def login(): #login command.
     global APIKEY,CLIENTID,CLIENTSECRET
     CLIENTID = loginentry.get()
     CLIENTSECRET = passentry.get()
@@ -52,21 +57,54 @@ def login():
             print("login successful")
             root.withdraw()
             main.deiconify()
-        logassemble = f"tailscale up --auth-key={AUTH}"
+        logassemble = f"sudo tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
 
-def join():
+def sudofetch(): #determine if sudo works and show next screen if successful.
+    global SUDO
+    SUDO = authentry.get()
+    if SUDO == "":
+        print("Error: Nothing in authentication!")
+    else:
+        cmd_queue.put("echo success!")
+        cmd_queue.join()
+        if not sudo_ready():
+            print("sudo not authenticated, verify contents...")
+        else:
+            #authentry.delete(0,END)
+            authlevel.withdraw()
+            root.deiconify()
+
+def join(): #for the join tab of the initialize window.
     global AUTH
     AUTH = joinentry.get()
     cmd_queue.put(f"tailscale up --auth-key={AUTH}")
 
+
+
 def bash_worker():
-    global STDOUT
+    global STDOUT, SUDO, inject
+        
     while True:
         cmd = cmd_queue.get()
         if cmd is None:
             break
         try:
+            if sudo_ready() == False:
+                try:
+                    print("SUDO not detected! Injecting...")
+                    inject.sendline("sudo -v")
+                    inject.expect(r"[Pp]assword")
+                    inject.sendline(SUDO)
+                    inject.expect(r".+\$ ", timeout=2)
+
+                except Exception as E:
+                    print("sudError: ", E)
+            
+            #if not cmd.startswith("sudo"):
+                #args = shlex.split("sudo "+cmd)
+            #else:i 
+            '''
             args = shlex.split(cmd)
             result = subprocess.run(args, capture_output=True, text=True)
             if result.returncode == 0:
@@ -75,11 +113,25 @@ def bash_worker():
                 print("EXIT:", result.returncode)
                 STDOUT = result.stdout
                 print("ERR:", result.stderr)
+            '''
+            #god i want to throw my laptop at a brick wall
+            inject.sendline(f"sudo {cmd}")
+            inject.expect(r".+\$ ", timeout=2)
+            STDOUT = inject.before.split("\r\n", 1)[-1] 
+
 
         except Exception as e:
             print("Worker error:", e)
         cmd_queue.task_done()
 
+def sudo_ready(): #checks if sudo is running, returns true or false.
+    inject.sendline("sudo -n true && echo READY || echo NEEDPASS")
+    i = inject.expect(r"\$ ",timeout=0.1)
+    output = inject.before.strip()
+    if "READY" in output:
+        return True
+    else:
+        return False
 
 
 def requesttoken(cid, cs):
@@ -262,6 +314,22 @@ joinlabel = Label(jointab, text="Welcome to tunnelNET!")
 joinlabel2 = Label(jointab, text="Please enter your join key (tskey-auth):")
 joinentry = Entry(jointab)
 joinbutton = Button(jointab, text="Connect", command=join)
+
+#this next chunk is for auth
+if system == "Linux":
+    authlevel = Toplevel(root)
+    authlevel.resizable(FALSE,FALSE)
+    authlevel.geometry("350x150+200+200")
+    authentry = Entry(authlevel,show="*")
+    authlabel = Label(authlevel, text="Welcome to tunnelNET, for the linux part this application needs sudo to communicate with the tailscale daemon. If you wish to use tunnelNET please enter sudo auth below.", wraplength=300)
+    authbutton = Button(authlevel, text="Authenticate",command=sudofetch)
+
+    authlevel.deiconify()
+    authlabel.pack()
+    authentry.pack()
+    authbutton.pack()
+    root.withdraw()
+
 
 joinlabel.grid(column=1, row=0 ,sticky=NSEW)
 joinlabel2.grid(column=1, row=1 ,sticky=NSEW)

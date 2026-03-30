@@ -23,8 +23,8 @@ def sendMessage():
         textbox.delete(0, tk.END)
 
 # Image loading
-bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Asset/computerBackground.png'
-logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Asset/tunnel.png'
+bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
+logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()

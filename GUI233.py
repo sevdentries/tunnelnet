@@ -38,10 +38,10 @@ main = tk.Tk()
 main.geometry('600x400+100+100')
 main.title('Tunnelnet')
 main.configure(bg="lightgray")
-main.columnconfigure(1, weight=2) # for mainchat
+main.columnconfigure(1, weight=3) # for mainchat
 main.columnconfigure(0, weight=1) # for profile
-main.rowconfigure(1, weight=20) # for chat
-main.rowconfigure(0, weight=1) # for computer background image
+main.rowconfigure(1, weight=10) # for chat
+main.rowconfigure(0, weight=0) # for computer background image
 
 # Images variables
 bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
@@ -54,7 +54,7 @@ logoimg = logoimgdata.subsample(5,5)
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
-bgimglabel.grid(column = 0, row=0, columnspan=2, sticky='nsew')
+bgimglabel.grid(column=0, row=0, columnspan=2)
 
 # Profile frame (all of left) 
 profileframe = tk.Frame(main, bg=PROFILEBG)

@@ -60,6 +60,12 @@ def login(): #login command.
         logassemble = f"sudo tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
 
+
+def join(): #for the join tab of the initialize window.
+    global AUTH
+    AUTH = joinentry.get()
+    cmd_queue.put(f"tailscale up --auth-key={AUTH}")
+
 def sudofetch(): #determine if sudo works and show next screen if successful.
     global SUDO
     SUDO = authentry.get()
@@ -75,13 +81,6 @@ def sudofetch(): #determine if sudo works and show next screen if successful.
             authlevel.withdraw()
             root.deiconify()
 
-def join(): #for the join tab of the initialize window.
-    global AUTH
-    AUTH = joinentry.get()
-    cmd_queue.put(f"tailscale up --auth-key={AUTH}")
-
-
-
 def bash_worker():
     global STDOUT, SUDO, inject
         
@@ -93,10 +92,10 @@ def bash_worker():
             if sudo_ready() == False:
                 try:
                     print("SUDO not detected! Injecting...")
-                    inject.sendline("sudo -v")
+                    inject.sendline("sudo -s")
                     inject.expect(r"[Pp]assword")
                     inject.sendline(SUDO)
-                    inject.expect(r".+\$ ", timeout=2)
+                    inject.expect(r"# ", timeout=3)
 
                 except Exception as E:
                     print("sudError: ", E)
@@ -116,7 +115,7 @@ def bash_worker():
             '''
             #god i want to throw my laptop at a brick wall
             inject.sendline(f"sudo {cmd}")
-            inject.expect(r".+\$ ", timeout=2)
+            inject.expect(r"# ", timeout=2)
             STDOUT = inject.before.split("\r\n", 1)[-1] 
 
 
@@ -126,7 +125,7 @@ def bash_worker():
 
 def sudo_ready(): #checks if sudo is running, returns true or false.
     inject.sendline("sudo -n true && echo READY || echo NEEDPASS")
-    i = inject.expect(r"\$ ",timeout=0.1)
+    i = inject.expect(r"# ",timeout=1)
     output = inject.before.strip()
     if "READY" in output:
         return True

@@ -30,6 +30,7 @@ def sendMessage():
 # Image loading
 bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
 logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
+settingimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/frontend/Assets/settings.png'
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()

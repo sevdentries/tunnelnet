@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import *
 from urllib.request import urlopen
 import webbrowser
 import os
@@ -10,6 +11,7 @@ PROFILEBG = "#1B1C1E"
 CHATBG = "#2C2E31"
 TEXTBG = "#32363B"
 SELECTBG = "#6C727C"
+SERVERBG = "#202124"
 
 # Variables
 # placeholder
@@ -41,7 +43,7 @@ main = tk.Tk()
 main.geometry('600x400+100+100')
 main.title('Tunnelnet')
 main.configure(bg="lightgray")
-main.columnconfigure(1, weight=7) # for mainchat
+main.columnconfigure(1, weight=8) # for mainchat
 main.columnconfigure(0, weight=1) # for profile
 main.rowconfigure(1, weight=10) # for chat
 main.rowconfigure(0, weight=0) # for computer background image
@@ -62,7 +64,7 @@ bgimglabel.grid(column=0, row=0, columnspan=2)
 profileframe = tk.Frame(main, bg=PROFILEBG)
 profileframe.grid(column=0, row=1, sticky='nsew')
 profileframe.grid_columnconfigure(0, weight=0)
-profileframe.grid_columnconfigure(1, weight=0)
+profileframe.grid_columnconfigure(1, weight=1)
 profileframe.grid_columnconfigure(2, weight=0)
 profileframe.grid_rowconfigure(0, weight=0)
 profileframe.grid_rowconfigure(1, weight=1)
@@ -74,6 +76,9 @@ logoimglabel.grid(column=0, row=0, padx=20, pady=20)
 
 namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
+
+serverframe = tk.Frame(profileframe, bg=SERVERBG)
+serverframe.grid(column=0, row=1, columnspan=3, sticky='nsew')
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)
@@ -107,7 +112,7 @@ inputframe.rowconfigure(0, weight=1)
 inputframe.grid(column=0, row=1, columnspan=2, sticky='nsew')
 
 # Textbox and send button
-textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectforeground=TEXTBG, fg='white')
+textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectbackground='white', fg='white')
 textbox.grid(column=0, row=0, sticky='ew', padx=5, pady=10)
 textbox.bind("<Return>", lambda event:sendMessage()) # allows pressing enter to chat
 sendbtn = tk.Button(inputframe, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage)
@@ -117,7 +122,7 @@ sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
 def resize_text(event):
     # Calculate new font size based on window width
     if event.widget == main:
-        new_size = max(20, int(event.width / 40))
+        new_size = max(20, int(event.width / 35))
         namelabel.config(font=("Arial", new_size))
 main.bind("<Configure>", resize_text) # allows the resize gets detected
 

@@ -44,7 +44,7 @@ main = tk.Tk()
 main.geometry('600x400+100+100')
 main.title('Tunnelnet')
 main.configure(bg="lightgray")
-main.columnconfigure(1, weight=8) # for mainchat
+main.columnconfigure(1, weight=10) # for mainchat
 main.columnconfigure(0, weight=1) # for profile
 main.rowconfigure(1, weight=10) # for chat
 main.rowconfigure(0, weight=0) # for computer background image
@@ -80,6 +80,25 @@ namelabel.grid(column=1, row=0)
 
 serverframe = tk.Frame(profileframe, bg=SERVERBG)
 serverframe.grid(column=0, row=1, columnspan=3, sticky='nsew')
+serverframe.grid_columnconfigure(0, weight=1)
+serverframe.grid_columnconfigure(1, weight=3)
+serverframe.grid_columnconfigure(2, weight=0)
+serverframe.grid_rowconfigure(0, weight=1)
+serverframe.grid_rowconfigure(1, weight=5)
+serverframe.grid_rowconfigure(2, weight=5)
+serverframe.grid_rowconfigure(3, weight=5)
+
+usertitlelabel = tk.Label(serverframe, text='Users', font=100)
+usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
+
+testlabel = tk.Label(serverframe, text='User1', font=40)
+testlabel.grid(column=1, row=1)
+
+testlabel2 = tk.Label(serverframe, text='User2', font=40)
+testlabel2.grid(column=1, row=2)
+
+testlabel3 = tk.Label(serverframe, text='User3', font=40)
+testlabel3.grid(column=1, row=3)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)
@@ -123,8 +142,8 @@ sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
 def resize_text(event):
     # Calculate new font size based on window width
     if event.widget == main:
-        new_size = max(20, int(event.width / 35))
-        namelabel.config(font=("Arial", new_size))
+        logo_size = max(20, int(event.width / 35))
+        namelabel.config(font=("Arial", logo_size))
 main.bind("<Configure>", resize_text) # allows the resize gets detected
 
 # Temporary testing code

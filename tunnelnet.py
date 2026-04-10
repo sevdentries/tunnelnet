@@ -13,6 +13,9 @@ from tkinter import *
 from tkinter import ttk
 import tkinter as tk
 import pexpect
+import socket
+import re
+import json
 
 userdir = Path(__file__).resolve()
 
@@ -23,10 +26,21 @@ CLIENTSECRET = ""
 CLIENTID = ""
 APIKEY = ""
 TAILNET = ""
+TAILNAME = ""
 AUTH = ""
 STDOUT = ""
 SUDO = ""
+ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
+JSONFLAG = False
+JSONDECODER = json.JSONDecoder()
+JSON = ""
 USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
+SUDOAUTH = False
+ISHOST = False
+
+#updated information (stuff that needs to be refreshed)
+SELF = {}
+DEVICES = {}
 #tunnelnet should only save the clientID. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
@@ -34,7 +48,10 @@ USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
 inject = pexpect.spawn("/bin/bash", encoding="utf-8")
 inject.logfile = sys.stdout
 def login(): #login command.
-    global APIKEY,CLIENTID,CLIENTSECRET
+    '''
+    login function, works with the tailscale webAPI to claim an API key, and an auth key.
+    '''
+    global APIKEY,CLIENTID,CLIENTSECRET,ISHOST
     CLIENTID = loginentry.get()
     CLIENTSECRET = passentry.get()
     if CLIENTID == "" or CLIENTSECRET == "":
@@ -48,6 +65,7 @@ def login(): #login command.
         print(status)
         status2 = authkey(APIKEY)
         if status == 200 and status2 == 200:
+            ISHOST = True
             try:
                 with open(USERSAVEDIR, "w") as dingus2:
                     dingus2.write(CLIENTID)
@@ -57,83 +75,141 @@ def login(): #login command.
             print("login successful")
             root.withdraw()
             main.deiconify()
-        logassemble = f"sudo tailscale up --auth-key={AUTH}"
+        logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
 
 
-def join(): #for the join tab of the initialize window.
-    global AUTH
+def join(): 
+    '''
+    for the join tab of the initialize window.
+    '''
+    global AUTH, ISHOST
     AUTH = joinentry.get()
     cmd_queue.put(f"tailscale up --auth-key={AUTH}")
+    ISHOST = False
 
-def sudofetch(): #determine if sudo works and show next screen if successful.
-    global SUDO
+def sudofetch(): 
+    '''
+    determine if sudo works and show next screen if successful.
+    '''
+    global SUDO, SUDOAUTH, JSONFLAG
     SUDO = authentry.get()
     if SUDO == "":
         print("Error: Nothing in authentication!")
     else:
         cmd_queue.put("echo success!")
         cmd_queue.join()
-        if not sudo_ready():
-            print("sudo not authenticated, verify contents...")
-        else:
-            #authentry.delete(0,END)
+        # Give the worker thread time to authenticate
+        import time
+        time.sleep(1)
+        if SUDOAUTH:
             authlevel.withdraw()
             root.deiconify()
+            JSONFLAG = True
+            cmd_queue.put("tailscale status --json")
+            ###############################################continue here
+            cmd_queue.join()
+            if JSON["BackendState"] == "Running":
+                initialize.add(softlogtab, text="Soft Login")
+                softloglabel.grid(row=0, column=1, sticky=NSEW)
+                softloglabel2.grid(row=1,column=1, sticky=NSEW)
+                softlogbutton.grid(row=2,column=1,sticky=NSEW)
+                
+
+        else:
+            print("sudo authentication failed, verify password...")
 
 def bash_worker():
-    global STDOUT, SUDO, inject
-        
+    global STDOUT, SUDO, inject, SUDOAUTH, JSONFLAG, JSONDECODER, JSON
+    
     while True:
         cmd = cmd_queue.get()
         if cmd is None:
             break
         try:
-            if sudo_ready() == False:
+            # Authenticate sudo ONCE at the start, not for every command
+            if not SUDOAUTH:
                 try:
                     print("SUDO not detected! Injecting...")
                     inject.sendline("sudo -s")
-                    inject.expect(r"[Pp]assword")
+                    inject.expect(r"[Pp]assword", timeout=5)
                     inject.sendline(SUDO)
-                    inject.expect(r"# ", timeout=3)
-
+                    inject.expect(r"# ", timeout=5)
+                    SUDOAUTH = True
+                    print("Sudo authenticated successfully")
                 except Exception as E:
                     print("sudError: ", E)
+                    SUDOAUTH = False
             
-            #if not cmd.startswith("sudo"):
-                #args = shlex.split("sudo "+cmd)
-            #else:i 
-            '''
-            args = shlex.split(cmd)
-            result = subprocess.run(args, capture_output=True, text=True)
-            if result.returncode == 0:
-                STDOUT = result.stdout
-            else:
-                print("EXIT:", result.returncode)
-                STDOUT = result.stdout
-                print("ERR:", result.stderr)
-            '''
-            #god i want to throw my laptop at a brick wall
-            inject.sendline(f"sudo {cmd}")
-            inject.expect(r"# ", timeout=2)
-            STDOUT = inject.before.split("\r\n", 1)[-1] 
-
+            # Only send the command (without sudo prefix, since we're already root)
+            inject.sendline(cmd)
+            inject.expect(r"# ", timeout=5)
+            STDOUT = inject.before.split("\r\n", 1)[-1]
+            STDOUT = ansi_escape.sub('', STDOUT).strip()
+            if JSONFLAG == True:
+                JSON, index = JSONDECODER.raw_decode(STDOUT)
+                JSONFLAG = False
 
         except Exception as e:
             print("Worker error:", e)
-        cmd_queue.task_done()
+        finally:
+            cmd_queue.task_done()
 
-def sudo_ready(): #checks if sudo is running, returns true or false.
-    inject.sendline("sudo -n true && echo READY || echo NEEDPASS")
-    i = inject.expect(r"# ",timeout=1)
-    output = inject.before.strip()
-    if "READY" in output:
-        return True
-    else:
-        return False
+def jsonhandler(bashcmd):
+    '''
+    simple function to handle json responses from bash worker. takes a json expecting bash command; all outputs translated to a dict in global JSON.
+    '''
+    global JSONFLAG
+    print("json parse requested")
+    JSONFLAG = True
+    cmd_queue.put(bashcmd)
 
+def refreshnet():
+    '''
+    function for refreshing all information relating to a user's tailnet (devices, ips, etc)
+    '''
+    global JSONFLAG, SELF, JSON, TAILNET, STDOUT, TAILNAME, DEVICES
+    try:
+        JSONFLAG = True
+        cmd_queue.put("tailscale status --json")
+        cmd_queue.join()
+        if "Tailscale is stopped." in JSON["Health"]:
+            print("tailscale service stopped... restarting...")
+            cmd_queue.put("tailscale up")
+            JSONFLAG = True
+            cmd_queue.put("tailscale status --json")
+            cmd_queue.join()
+        TAILNAME = (JSON["CurrentTailnet"])["Name"]
+
+        ##COMMAND SPECIFIC
+
+        cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
+        cmd_queue.join()
+
+        for char in "\\r\\n":
+            STDOUT = STDOUT.replace(char, " ")
+        assembly = STDOUT.split()
+        toggle = 1
+        obj1 = ""
+        obj2 = ""
+        for object in assembly:
+            if toggle == 1:
+                toggle = 2
+                obj1 = object
+            elif toggle == 2:
+                toggle = 1
+                obj2 = object
+                DEVICES[obj1] = obj2
+        print(len(DEVICES))
+    except Exception as e:
+        print("Error:", e)
+
+    
 
 def requesttoken(cid, cs):
+    '''
+    Requests an API key if the login function is called. input the preset oauth client id and client secret and output to APIKEY global.
+    '''
     global APIKEY,CLIENTID,CLIENTSECRET
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
     response = requests.post(
@@ -147,15 +223,27 @@ def requesttoken(cid, cs):
 
 
 def listdevices(apikey, tailnet = "-"):
-    token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
-    response = requests.get(
-        token_url,
-        headers= {'Authorization':f"Bearer {apikey}"}
-    )
-    print(response)
-    print(response.json())
+    '''
+    lists devices from the tailscale api.
+    changes methods depending on whether the client has host access or local net access.
+    use flag (ISHOST to create if clause.)
+    '''
+    if ISHOST == True:
+        token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
+        response = requests.get(
+            token_url,
+            headers= {'Authorization':f"Bearer {apikey}"}
+        )
+        print(response)
+        print(response.json())
+    else:
+        JSONFLAG == True
+        cmd_queue.put("tailscale status --json")
 
 def authkey(apikey, tailnet = "-"):
+    '''
+    uses the apikey and fetches an authkey for the program.
+    '''
     global AUTH
     token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/keys"
     response = requests.post(
@@ -314,6 +402,12 @@ joinlabel2 = Label(jointab, text="Please enter your join key (tskey-auth):")
 joinentry = Entry(jointab)
 joinbutton = Button(jointab, text="Connect", command=join)
 
+softlogtab = Frame(initialize)
+softloglabel = Label(softlogtab, text="Welcome to tunnelNET!")
+softloglabel2 = Label(softlogtab, text="The tailscale service was found to be logged in, if you want to login as a user instead of a host click login below, otherwise go to the login tab.", wraplength=300)
+softlogbutton = Button(softlogtab,text="Login")
+
+
 #this next chunk is for auth
 if system == "Linux":
     authlevel = Toplevel(root)
@@ -346,9 +440,11 @@ loginbutton = Button(logintab, text="Login", command=login)
 for bcol in range(3):
     logintab.columnconfigure(bcol, weight=1)
     jointab.columnconfigure(bcol, weight=1)
+    softlogtab.columnconfigure(bcol, weight=1)
 for crow in range(8):
     logintab.rowconfigure(crow, weight=1)
     jointab.rowconfigure(crow, weight=1)
+    softlogtab.rowconfigure(crow, weight=1)
 
 initialize.add(logintab, text="Login")
 initialize.add(jointab, text="Join")

@@ -114,4 +114,30 @@ scrollbar = ttk.Scrollbar(inputframe, orient = 'vertical')
 scrollbar.place(relx = 0, rely = 1, relheight = 1, anchor = 'ne')
 # N/A
 
+# Chat Commands
+def NewChat():
+    NewChatWindow = tk.Toplevel()
+    NewChatWindow.title('New Chat')
+    NewChatWindow.geometry('700x500')
+
+def NewRoom():
+    NewRoomWindow = tk.Toplevel()
+    NewRoomWindow.title('New Room')
+
+#New Chat
+Menusmain = tk.Menu(main)
+main.config(menu = Menusmain)
+
+Chats = tk.Menu(Menusmain, tearoff = 0)
+Menusmain.add_cascade(label = 'Chats', menu = Chats)
+Chats.add_command(label = 'New Chat', command = NewChat)
+Chats.add_command(label = 'New Room', command = NewRoom)
+
+
+
+#New Chat windows
+
+
+
+
 main.mainloop()

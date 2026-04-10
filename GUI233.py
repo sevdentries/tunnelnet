@@ -69,10 +69,11 @@ profileframe.grid_columnconfigure(1, weight=1)
 profileframe.grid_columnconfigure(2, weight=0)
 profileframe.grid_rowconfigure(0, weight=0)
 profileframe.grid_rowconfigure(1, weight=0)
-profileframe.grid_rowconfigure(2, weight=1)
+profileframe.grid_rowconfigure(2, weight=0)
+profileframe.grid_rowconfigure(3, weight=1)
 
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
-logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=2)
+logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 
 namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
@@ -80,9 +81,12 @@ namelabel.grid(column=1, row=0)
 userlabel = tk.Label(profileframe, text="Welcome, User", font=("Arial", 10))
 userlabel.grid(column=1, row=1)
 
+IPlabel = tk.Label(profileframe, text="Logged in from IP...", font=("Arial", 10))
+IPlabel.grid(column=1, row=2)
+
 # Server frame (users and other online people); part of Profileframe
 serverframe = tk.Frame(profileframe, bg=SERVERBG)
-serverframe.grid(column=0, row=2, columnspan=3, sticky='nsew')
+serverframe.grid(column=0, row=3, columnspan=3, sticky='nsew')
 serverframe.grid_columnconfigure(0, weight=1)
 serverframe.grid_columnconfigure(1, weight=3)
 serverframe.grid_columnconfigure(2, weight=0)
@@ -148,6 +152,7 @@ def resize_text(event):
         logo_size = max(20, int(event.width / 40))
         namelabel.config(font=("Arial", logo_size))
         userlabel.config(font=("Arial", int(logo_size/2)))
+        IPlabel.config(font=("Arial", int(logo_size/3)))
 main.bind("<Configure>", resize_text) # allows the resize gets detected
 
 # Temporary testing code

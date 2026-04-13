@@ -14,8 +14,7 @@ SELECTBG = "#6C727C"
 SERVERBG = "#202124"
 
 # Variables
-Chatrooms = 0
-Chatentries = []
+
 # placeholder
 
 # Commands
@@ -157,30 +156,59 @@ def resize_text(event):
         IPlabel.config(font=("Arial", int(logo_size/3)))
 main.bind("<Configure>", resize_text) # allows the resize gets detected
 
+#Chat Variables
+    #New Chat
+DMchat = 0
+DMentries = []
+
+    #New Chatrooms
+Chatrooms = 0
+Chatentries = []
+
+
 # Chat Commands
 def NewChat():
-    print('hi')
+    global DMchat
+    DMchat = DMchat + 1
+    NewDMchatWindow = tk.Toplevel()
+    NewDMchatWindow.title = (f'Chat #{DMchat}')
+    NewDMchatWindow.geometry('700x500')
+
+    DMchatlabel = tk.Label(NewDMchatWindow, text = (f'DM Chat {DMchat}'), font = ('Ink Free', 16))
+    DMchatlabel.pack(pady = 10)
+
+    DMchatNameentry = tk.Entry(NewDMchatWindow, font = ('Consolas', 10))
+    DMchatNameentry.insert(0, f'User in Room {DMchat}')
+    DMchatNameentry.pack(pady = 5)
+
+    DMentries.append({
+        "DMrooms": DMchat,
+        "DMlabel": DMchatlabel,
+        "DMentry": DMchatNameentry
+
+    })
+
 
 
 
 def NewRoom():
     global Chatrooms
     Chatrooms = Chatrooms + 1
-    NewChatWindow = tk.Toplevel()
-    NewChatWindow.title(f'Chat #{Chatrooms}')
-    NewChatWindow.geometry('700x500')
+    NewChatRoomWindow = tk.Toplevel()
+    NewChatRoomWindow.title(f'Chat #{Chatrooms}')
+    NewChatRoomWindow.geometry('700x500')
     
-    Chatlabel = tk.Label(NewChatWindow, text = (f'Chat Room {Chatrooms}'), font = ('Ink Free', 16))
-    Chatlabel.pack(pady = 10)
+    Chatroomlabel = tk.Label(NewChatRoomWindow, text = (f'Chat Room {Chatrooms}'), font = ('Ink Free', 16))
+    Chatroomlabel.pack(pady = 10)
 
-    Nameentry = tk.Entry(NewChatWindow, font = ('Consolas', 10))
-    Nameentry.insert(0, f'User in Room {Chatrooms}')
-    Nameentry.pack(pady = 5)
+    ChatroomNameentry = tk.Entry(NewChatRoomWindow, font = ('Consolas', 10))
+    ChatroomNameentry.insert(0, f'User in Room {Chatrooms}')
+    ChatroomNameentry.pack(pady = 5)
 
     Chatentries.append({
         "rooms": Chatrooms,
-        "label": Chatlabel,
-        "name": Nameentry
+        "label": Chatroomlabel,
+        "name": ChatroomNameentry
     })
 
 

@@ -60,6 +60,7 @@ def login(): #login command.
         print("login bypassed")
         root.withdraw()
         main.deiconify()
+        refreshnet()
     else:
         status = requesttoken(CLIENTID, CLIENTSECRET)
         print(status)
@@ -186,12 +187,15 @@ def refreshnet():
         cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
         cmd_queue.join()
 
-        for char in "\\r\\n":
+        STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
+
+        for char in "\r\n":
             STDOUT = STDOUT.replace(char, " ")
         assembly = STDOUT.split()
         toggle = 1
         obj1 = ""
         obj2 = ""
+
         for object in assembly:
             if toggle == 1:
                 toggle = 2
@@ -402,10 +406,15 @@ joinlabel2 = Label(jointab, text="Please enter your join key (tskey-auth):")
 joinentry = Entry(jointab)
 joinbutton = Button(jointab, text="Connect", command=join)
 
+def softlogfunc():
+    root.withdraw()
+    main.deiconify()
+    refreshnet()
+
 softlogtab = Frame(initialize)
 softloglabel = Label(softlogtab, text="Welcome to tunnelNET!")
 softloglabel2 = Label(softlogtab, text="The tailscale service was found to be logged in, if you want to login as a user instead of a host click login below, otherwise go to the login tab.", wraplength=300)
-softlogbutton = Button(softlogtab,text="Login")
+softlogbutton = Button(softlogtab,text="Login", command=softlogfunc)
 
 
 #this next chunk is for auth

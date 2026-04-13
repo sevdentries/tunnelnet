@@ -14,6 +14,8 @@ SELECTBG = "#6C727C"
 SERVERBG = "#202124"
 
 # Variables
+Chatrooms = 0
+Chatentries = []
 # placeholder
 
 # Commands
@@ -157,14 +159,32 @@ main.bind("<Configure>", resize_text) # allows the resize gets detected
 
 # Chat Commands
 def NewChat():
-    NewChatWindow = tk.Toplevel()
-    NewChatWindow.title('New Chat')
-    NewChatWindow.geometry('700x500')
+    print('hi')
+
+
 
 def NewRoom():
-    NewRoomWindow = tk.Toplevel()
-    NewRoomWindow.title('New Room')
+    global Chatrooms
+    Chatrooms = Chatrooms + 1
+    NewChatWindow = tk.Toplevel()
+    NewChatWindow.title(f'Chat #{Chatrooms}')
+    NewChatWindow.geometry('700x500')
+    
+    Chatlabel = tk.Label(NewChatWindow, text = (f'Chat Room {Chatrooms}'), font = ('Ink Free', 16))
+    Chatlabel.pack(pady = 10)
 
+    Nameentry = tk.Entry(NewChatWindow, font = ('Consolas', 10))
+    Nameentry.insert(0, f'User in Room {Chatrooms}')
+    Nameentry.pack(pady = 5)
+
+    Chatentries.append({
+        "rooms": Chatrooms,
+        "label": Chatlabel,
+        "name": Nameentry
+    })
+
+
+    
 #New Chat
 Menusmain = tk.Menu(main)
 main.config(menu = Menusmain)

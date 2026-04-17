@@ -2,6 +2,7 @@ import platform
 import requests
 import shlex
 import subprocess
+import atexit
 import threading
 import queue
 import warnings
@@ -37,6 +38,7 @@ JSON = ""
 USERSAVEDIR = str(userdir.parent)+"/Assets/usersave.txt"
 SUDOAUTH = False
 ISHOST = False
+ISLOG = False
 
 #updated information (stuff that needs to be refreshed)
 SELF = {}
@@ -51,7 +53,7 @@ def login(): #login command.
     '''
     login function, works with the tailscale webAPI to claim an API key, and an auth key.
     '''
-    global APIKEY,CLIENTID,CLIENTSECRET,ISHOST
+    global APIKEY,CLIENTID,CLIENTSECRET,ISHOST, ISLOG
     CLIENTID = loginentry.get()
     CLIENTSECRET = passentry.get()
     if CLIENTID == "" or CLIENTSECRET == "":
@@ -78,16 +80,21 @@ def login(): #login command.
             main.deiconify()
         logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
+        ISLOG = True
 
 
 def join(): 
     '''
     for the join tab of the initialize window.
     '''
-    global AUTH, ISHOST
+    global AUTH, ISHOST, ISLOG
     AUTH = joinentry.get()
     cmd_queue.put(f"tailscale up --auth-key={AUTH}")
     ISHOST = False
+    ISLOG = True
+    root.withdraw()
+    main.deiconify()
+
 
 def sudofetch(): 
     '''
@@ -216,12 +223,15 @@ def requesttoken(cid, cs):
     '''
     global APIKEY,CLIENTID,CLIENTSECRET
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
-    response = requests.post(
-        token_url,
-        data={"grant_type": "client_credentials"},
-        auth=(cid, cs),
-    )
-    APIKEY = response.json()["access_token"]
+    try:
+        response = requests.post(
+            token_url,
+            data={"grant_type": "client_credentials"},
+            auth=(cid, cs),
+        )
+        APIKEY = response.json()["access_token"]
+    except KeyError:
+        print(response.json()["message"])
     print("key requested: "+APIKEY)
     return response.status_code
 
@@ -273,8 +283,9 @@ def authkey(apikey, tailnet = "-"):
     return response.status_code
 
 
-def getkeystatus(apikey):
-    pass
+def exitcatcher():
+    print("exit triggered")
+    cmd_queue.put("tailscale logout")
 
 #BASH THREAD STARTER
 if system == "Linux":
@@ -284,6 +295,8 @@ if system == "Linux":
 else:
     warnings.warn("bash worker thread skipped, login will not work! (use \"testing\" in password to bypass)")
 
+
+atexit.register(exitcatcher)
 #ROOT CONFIGS
 root = Tk()
 root.geometry("300x150+200+200")

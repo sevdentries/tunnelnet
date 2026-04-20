@@ -18,6 +18,8 @@ import socket
 import re
 import json
 
+#macbackend pull
+
 userdir = Path(__file__).resolve()
 
 system = platform.system()#OS CHECK STARTS HERE, should return "Windows", "Linux", or "Darwin" for MacOS.
@@ -40,6 +42,13 @@ SUDOAUTH = False
 ISHOST = False
 ISLOG = False
 
+#############
+msg_queue = queue.Queue()
+cmd_queue = queue.Queue()
+MESG_PORT = 55555
+chat_logs = {}
+#############
+
 #updated information (stuff that needs to be refreshed)
 SELF = {}
 DEVICES = {}
@@ -47,8 +56,31 @@ DEVICES = {}
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
-inject = pexpect.spawn("/bin/bash", encoding="utf-8")
-inject.logfile = sys.stdout
+if system == "Windows":
+    try:
+        from pexpect.popen_spawn import PopenSpawn
+        inject = PopenSpawn("cmd.exe", encoding="utf-8")
+    except (ImportError, Exception):
+        inject = None
+else:
+    shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
+    inject = pexpect.spawn(shell_path, encoding="utf-8")
+
+if inject:
+    inject.logfile = sys.stdout
+
+import time # Needed for timestamps
+def send_packet(target_ip, message):
+    """
+    Helper to queue a message for sending.
+    """
+    payload = {
+        "destination": target_ip, # The user said "destination device name" but we need IP to connect
+        "sender": TAILNAME or socket.gethostname(),
+        "message": message,
+        "timestamp": str(time.time())
+    }
+    msg_queue.put((target_ip, payload))
 def login(): #login command.
     '''
     login function, works with the tailscale webAPI to claim an API key, and an auth key.
@@ -137,21 +169,36 @@ def bash_worker():
         try:
             # Authenticate sudo ONCE at the start, not for every command
             if not SUDOAUTH:
-                try:
-                    print("SUDO not detected! Injecting...")
-                    inject.sendline("sudo -s")
-                    inject.expect(r"[Pp]assword", timeout=5)
-                    inject.sendline(SUDO)
-                    inject.expect(r"# ", timeout=5)
-                    SUDOAUTH = True
-                    print("Sudo authenticated successfully")
-                except Exception as E:
-                    print("sudError: ", E)
-                    SUDOAUTH = False
+                if system == "Windows":
+                    # Windows doesn't use sudo in the same way; 
+                    # for now, we assume the process has necessary rights
+                    # or we could implement runas logic here.
+                    SUDOAUTH = True 
+                    print("Windows shell initialized")
+                else:
+                    try:
+                        print(f"SUDO not detected on {system}! Injecting...")
+                        inject.sendline("sudo -s")
+                        inject.expect(r"[Pp]assword", timeout=5)
+                        inject.sendline(SUDO)
+                        # Mac/Linux prompts might differ; # is common for root
+                        inject.expect([r"# ", r"\$ "], timeout=5)
+                        SUDOAUTH = True
+                        print("Sudo authenticated successfully")
+                    except Exception as E:
+                        print("sudError: ", E)
+                        SUDOAUTH = False
             
-            # Only send the command (without sudo prefix, since we're already root)
-            inject.sendline(cmd)
-            inject.expect(r"# ", timeout=5)
+            # Only send the command
+            if system == "Windows":
+                # For Windows commands, we might need a different echo or prompt check
+                inject.sendline(cmd)
+                # cmd.exe usually ends with >
+                inject.expect(r">", timeout=5)
+            else:
+                inject.sendline(cmd)
+                inject.expect([r"# ", r"\$ "], timeout=5)
+            
             STDOUT = inject.before.split("\r\n", 1)[-1]
             STDOUT = ansi_escape.sub('', STDOUT).strip()
             if JSONFLAG == True:
@@ -288,12 +335,83 @@ def exitcatcher():
     cmd_queue.put("tailscale logout")
 
 #BASH THREAD STARTER
-if system == "Linux":
-    cmd_queue = queue.Queue()
-    thread = threading.Thread(target=bash_worker, daemon=True)
-    thread.start()
-else:
-    warnings.warn("bash worker thread skipped, login will not work! (use \"testing\" in password to bypass)")
+bash_thread = threading.Thread(target=bash_worker, daemon=True)
+bash_thread.start()
+
+def messaging_service():
+    """
+    Handles sending, receiving, and acknowledging messages.
+    """
+    def listener():
+        # TCP Listener Thread
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(('0.0.0.0', MESG_PORT))
+            s.listen()
+            print(f"Messaging listener started on port {MESG_PORT}")
+            while True:
+                conn, addr = s.accept()
+                with conn:
+                    data = conn.recv(4096).decode('utf-8')
+                    if data:
+                        try:
+                            msg = json.loads(data)
+                            sender = msg.get("sender", "Unknown")
+                            channel = sender # early stage: channel name is sender name
+                            
+                            # Format for chatlog
+                            # chat_logs[channel][timestamp] = {msg, sender, time, read}
+                            if channel not in chat_logs:
+                                chat_logs[channel] = {}
+                            
+                            timestamp = msg.get("timestamp", str(time.time()))
+                            chat_logs[channel][timestamp] = {
+                                "raw": msg.get("message", ""),
+                                "sender": sender,
+                                "timestamp": timestamp,
+                                "read": False
+                            }
+                            
+                            # ACK with a reply repeating and acknowledging the message
+                            ack = {
+                                "status": "ACK",
+                                "received_msg": msg.get("message", ""),
+                                "original_timestamp": timestamp,
+                                "sender": TAILNAME or "LocalHost"
+                            }
+                            conn.sendall(json.dumps(ack).encode('utf-8'))
+                            print(f"Message received from {sender}, ACK sent.")
+                        except Exception as e:
+                            print(f"Listener error: {e}")
+
+    # Start the listener thread
+    threading.Thread(target=listener, daemon=True).start()
+
+    # Worker for sending messages
+    while True:
+        target_ip, payload = msg_queue.get()
+        if target_ip is None: break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5)
+                s.connect((target_ip, MESG_PORT))
+                s.sendall(json.dumps(payload).encode('utf-8'))
+                
+                # Wait for ACK
+                ack_data = s.recv(4096).decode('utf-8')
+                if ack_data:
+                    ack = json.loads(ack_data)
+                    print(f"Message acknowledged by {target_ip}: {ack.get('status')}")
+                    # Update local log to show it was acknowledged? 
+                    # User said "both devices should have acknowledged that the msg has been received"
+        except Exception as e:
+            print(f"Send error to {target_ip}: {e}")
+        finally:
+            msg_queue.task_done()
+
+msg_thread = threading.Thread(target=messaging_service, daemon=True)
+msg_thread.start()
+
 
 
 atexit.register(exitcatcher)

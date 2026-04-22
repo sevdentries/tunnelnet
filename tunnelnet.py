@@ -45,7 +45,7 @@ ISLOG = False
 #############
 msg_queue = queue.Queue()
 cmd_queue = queue.Queue()
-MESG_PORT = 55555
+MESG_PORT = 55554
 chat_logs = {}
 #############
 
@@ -431,9 +431,9 @@ main.title("tunnelNET")
 main.geometry("600x400+200+200")
 main.configure(bg="lightgray")
 ### We can add more row/columns later
-main.columnconfigure(1, weight=3) # for mainchat
+main.columnconfigure(1, weight=10) # for mainchat
 main.columnconfigure(0, weight=1) # for profile
-main.rowconfigure(1, weight=1) # for chat
+main.rowconfigure(1, weight=10) # for chat
 main.rowconfigure(0, weight=0) # for computer background image
 
 # Colors (Can be changed in the future; just here for placeholder)
@@ -442,6 +442,7 @@ PROFILEBG = "#1B1C1E"
 CHATBG = "#2C2E31"
 TEXTBG = "#32363B"
 SELECTBG = "#6C727C"
+SERVERBG = "#202124"
 
 # Commands
 def sendMessage():
@@ -469,7 +470,6 @@ except Exception as linkerror:
 bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
 bgimg = bgimgdata.zoom(1,1)
 bgimg = bgimgdata.subsample(1,5)
-# bgimg = tk.PhotoImage(file='link') # code for file with correct dimensions.
 
 logoimgdata = tk.PhotoImage(data=logoimgraw)
 logoimg = logoimgdata.subsample(5,5)
@@ -483,11 +483,37 @@ profileframe = tk.Frame(main, bg=PROFILEBG)
 profileframe.grid(column=0, row=1, sticky='nsew')
 profileframe.grid_columnconfigure(0, weight=0)
 profileframe.grid_columnconfigure(1, weight=1)
+profileframe.grid_columnconfigure(2, weight=0)
 profileframe.grid_rowconfigure(0, weight=0)
-profileframe.grid_rowconfigure(1, weight=1)
+profileframe.grid_rowconfigure(1, weight=0)
+profileframe.grid_rowconfigure(2, weight=0)
+profileframe.grid_rowconfigure(3, weight=1)
 
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
-logoimglabel.grid(column=0, row=0, padx=20, pady=20)
+logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
+
+namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
+namelabel.grid(column=1, row=0)
+
+userlabel = tk.Label(profileframe, text="Welcome, User", font=("Arial", 10))
+userlabel.grid(column=1, row=1)
+
+IPlabel = tk.Label(profileframe, text="Logged in from IP...", font=("Arial", 10))
+IPlabel.grid(column=1, row=2)
+
+# Server frame (users and other online people); part of Profileframe
+serverframe = tk.Frame(profileframe, bg=SERVERBG)
+serverframe.grid(column=0, row=3, columnspan=3, sticky='nsew')
+serverframe.grid_columnconfigure(0, weight=1)
+serverframe.grid_columnconfigure(1, weight=3)
+serverframe.grid_columnconfigure(2, weight=0)
+serverframe.grid_rowconfigure(0, weight=1)
+serverframe.grid_rowconfigure(1, weight=5)
+serverframe.grid_rowconfigure(2, weight=5)
+serverframe.grid_rowconfigure(3, weight=5)
+
+usertitlelabel = tk.Label(serverframe, text='Users', font=100)
+usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)
@@ -496,21 +522,41 @@ mainchatframe.columnconfigure(0, weight=1)
 mainchatframe.columnconfigure(1, weight=1)
 mainchatframe.rowconfigure(0, weight=1) # for the chat to fill
 mainchatframe.rowconfigure(1, weight=0) # for the inputframe to remain same size
+mainchatframe.grid_propagate(False)
 
 # Chat frame notebook
 chattab = ttk.Notebook(mainchatframe)
+chattabcount = 3
+chatframes = []
 
 chatframe1 = tk.Frame(chattab)
 chatframe2 = tk.Frame(chattab)
 chatframe3 = tk.Frame(chattab)
-chatframe1.grid_columnconfigure(0, weight=1)
-chatframe2.grid_columnconfigure(0, weight=1)
-chatframe3.grid_columnconfigure(0, weight=1)
-
 chattab.add(chatframe1, text="F1")
 chattab.add(chatframe2, text="F2")
 chattab.add(chatframe3, text="F3")
+
+chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)
+
+for frames in (chatframes):
+    frames.grid_columnconfigure(0, weight = 1)
+
+def addchattab():
+    global chattabcount
+    if chattabcount < 20:
+        chattabcount += 1
+        newframe = tk.Frame(chattab)
+        newframe.grid_columnconfigure(0, weight = 1)
+        chattab.add(newframe, text=f"F{chattabcount}")
+        chatframes.append(newframe)
+        chattab.select(newframe)
+    else:
+        pass
+
+addtabbtn = tk.Button(chattab, text='Add Chat', bg=SELECTBG, fg='white', activebackground=BANNERBG, activeforeground='black', relief='flat', width=2)
+addtabbtn.config(command = addchattab)
+addtabbtn.pack(side=LEFT, anchor=NW)
 
 # Input frame (bottom-right) 
 inputframe = tk.Frame(mainchatframe, bg=TEXTBG)
@@ -520,11 +566,21 @@ inputframe.rowconfigure(0, weight=1)
 inputframe.grid(column=0, row=1, columnspan=2, sticky='nsew')
 
 # Textbox and send button
-textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectforeground=TEXTBG, fg='white')
+textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectbackground='white', fg='white')
 textbox.grid(column=0, row=0, sticky='ew', padx=5, pady=10)
 textbox.bind("<Return>", lambda event:sendMessage()) # allows pressing enter to chat
 sendbtn = tk.Button(inputframe, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage)
 sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
+
+# Other Functions
+def resize_text(event):
+    # Calculate new font size based on window width
+    if event.widget == main:
+        logo_size = max(20, int(event.width / 40))
+        namelabel.config(font=("Arial", logo_size))
+        userlabel.config(font=("Arial", int(logo_size/2)))
+        IPlabel.config(font=("Arial", int(logo_size/3)))
+main.bind("<Configure>", resize_text) # allows the resize gets detected
 
 main.withdraw()
 

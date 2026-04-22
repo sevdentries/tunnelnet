@@ -524,71 +524,39 @@ mainchatframe.rowconfigure(0, weight=1) # for the chat to fill
 mainchatframe.rowconfigure(1, weight=0) # for the inputframe to remain same size
 mainchatframe.grid_propagate(False)
 
-#Chat tab tracking variables
-chattabcount = 3
-chatframes = []
-
 # Chat frame notebook
 chattab = ttk.Notebook(mainchatframe)
+chattabcount = 3
+chatframes = []
 
 chatframe1 = tk.Frame(chattab)
 chatframe2 = tk.Frame(chattab)
 chatframe3 = tk.Frame(chattab)
-for frames in (chatframe1, chatframe2, chatframe3):
-    frames.grid_columnconfigure(0, weight = 1) #Makes column extend to fit new frames
-
 chattab.add(chatframe1, text="F1")
 chattab.add(chatframe2, text="F2")
 chattab.add(chatframe3, text="F3")
-chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 
+chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)
 
-addtabbtn = tk.Button(
-    chattab,
-    text = '+',
-    bg = SELECTBG,
-    fg = 'white',
-    activebackground = BANNERBG,
-    activeforeground = 'white',
-    relief = 'flat',
-    width = 2,
-    command = None 
-    )
-
-def updatebtnposition():
-    chattab.update_idletasks()
-    try:
-        lastindex = chattab.index('end') - 1
-        probey = 5
-        tabright = 0
-        for x in range(chattab.winfo_width()):
-            try:
-                if chattab.index(f'@{x}, {probey}') == lastindex:
-                    tabright = x
-            except tk.TclError:
-                pass
-        
-        addtabbtn.place(x = tabright + 4, y = 1, height = 22)
-    except Exception:
-        pass
+for frames in (chatframes):
+    frames.grid_columnconfigure(0, weight = 1)
 
 def addchattab():
     global chattabcount
-    chattabcount += 1
-    tablabel = f"F{chattabcount}"
-    newframe = tk.Frame(chattab)
-    newframe.grid_columnconfigure(0, weight = 1)
-    chattab.add(newframe, text = tablabel)
-    chatframes.append(newframe)
-    chattab.select(newframe) #Makes u switch tabs automatically
-    main.after(10, updatebtnposition) #Make sure notebook have time to register new tab before measuring "+" position
+    if chattabcount < 20:
+        chattabcount += 1
+        newframe = tk.Frame(chattab)
+        newframe.grid_columnconfigure(0, weight = 1)
+        chattab.add(newframe, text=f"F{chattabcount}")
+        chatframes.append(newframe)
+        chattab.select(newframe)
+    else:
+        pass
 
+addtabbtn = tk.Button(chattab, text='Add Chat', bg=SELECTBG, fg='white', activebackground=BANNERBG, activeforeground='black', relief='flat', width=2)
 addtabbtn.config(command = addchattab)
-
-main.bind('<Map>', lambda e: main.after(50, updatebtnposition))
-
-
+addtabbtn.pack(side=LEFT, anchor=NW)
 
 # Input frame (bottom-right) 
 inputframe = tk.Frame(mainchatframe, bg=TEXTBG)

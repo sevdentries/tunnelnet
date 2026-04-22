@@ -12,6 +12,7 @@ CHATBG = "#2C2E31"
 TEXTBG = "#32363B"
 SELECTBG = "#6C727C"
 SERVERBG = "#202124"
+DEVICES = {'banana', 'apple', 'user1', 'gchen'}
 
 # Variables
 # placeholder
@@ -98,14 +99,10 @@ serverframe.grid_rowconfigure(3, weight=5)
 usertitlelabel = tk.Label(serverframe, text='Users', font=100)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
-testlabel = tk.Label(serverframe, text='User1', font=40)
-testlabel.grid(column=1, row=1)
-
-testlabel2 = tk.Label(serverframe, text='User2', font=40)
-testlabel2.grid(column=1, row=2)
-
-testlabel3 = tk.Label(serverframe, text='User3', font=40)
-testlabel3.grid(column=1, row=3)
+devices_list = list(DEVICES)
+for i in range(len(devices_list)):
+    devicelabel = tk.Label(serverframe, text=str(devices_list[i]), font=40)
+    devicelabel.grid(column=1, row=i)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)

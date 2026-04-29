@@ -13,18 +13,32 @@ from pathlib import Path
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
+# If we detect old Tk, auto-relaunch with a newer Python if available.
 import _tkinter
 _tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
 if platform.system() == "Darwin" and _tk_ver < (8, 6):
-    print("=" * 60)
-    print("ERROR: Your Python's Tk version is too old for this macOS.")
-    print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
-    print(f"  Python: {sys.executable} ({sys.version.split()[0]})")
-    print()
-    print("  Fix: Install Python 3.10+ from https://python.org")
-    print("  Then run: python3.13 tunnelnet.py")
-    print("=" * 60)
-    sys.exit(1)
+    import shutil, os
+    # Look for a newer Python that has Tk 8.6+
+    _candidates = ["python3.13", "python3.12", "python3.11", "python3.10"]
+    _new_python = None
+    for _cand in _candidates:
+        _path = shutil.which(_cand)
+        if _path and os.path.realpath(_path) != os.path.realpath(sys.executable):
+            _new_python = _path
+            break
+    if _new_python:
+        print(f"System Python has Tk {_tkinter.TK_VERSION} (too old). Re-launching with {_new_python}...")
+        os.execv(_new_python, [_new_python] + sys.argv)
+    else:
+        print("=" * 60)
+        print("ERROR: Your Python's Tk version is too old for this macOS.")
+        print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
+        print(f"  Python: {sys.executable} ({sys.version.split()[0]})")
+        print()
+        print("  Fix: Install Python 3.10+ from https://python.org")
+        print("  Then run: python3.13 tunnelnet.py")
+        print("=" * 60)
+        sys.exit(1)
 
 from tkinter import *
 from tkinter import ttk
@@ -61,7 +75,7 @@ ISLOG = False
 #############
 msg_queue = queue.Queue()
 cmd_queue = queue.Queue()
-MESG_PORT = 55555
+MESG_PORT = 55554
 chat_logs = {}
 #############
 

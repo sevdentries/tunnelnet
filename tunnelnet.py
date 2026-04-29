@@ -90,15 +90,16 @@ if system == "Darwin":
     # macOS: use subprocess instead of pexpect — no sudo needed,
     # and pexpect + zsh mangles multi-line output (bracketed paste, ANSI codes).
     inject = None
-elif system == "Windows":
-    try:
-        from pexpect.popen_spawn import PopenSpawn
-        inject = PopenSpawn("cmd.exe", encoding="utf-8")
-    except (ImportError, Exception):
-        inject = None
 else:
-    shell_path = "/bin/bash"
-    inject = pexpect.spawn(shell_path, encoding="utf-8")
+    if system == "Windows":
+        try:
+            from pexpect.popen_spawn import PopenSpawn
+            inject = PopenSpawn("cmd.exe", encoding="utf-8")
+        except (ImportError, Exception):
+            inject = None
+    else:
+        shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
+        inject = pexpect.spawn(shell_path, encoding="utf-8")
 
 if inject:
     inject.logfile = sys.stdout
@@ -218,46 +219,45 @@ def bash_worker():
                     JSON = json.loads(STDOUT)
                     JSONFLAG = False
                 continue
-            
-            # ----- Windows / Linux path: use pexpect inject -----
-            # Authenticate sudo ONCE at the start, not for every command
-            if not SUDOAUTH:
-                if system == "Windows":
-                    # Windows doesn't use sudo in the same way; 
-                    # for now, we assume the process has necessary rights
-                    # or we could implement runas logic here.
-                    SUDOAUTH = True 
-                    print("Windows shell initialized")
-                else:
-                    try:
-                        print(f"SUDO not detected on {system}! Injecting...")
-                        inject.sendline("sudo -s")
-                        inject.expect(r"[Pp]assword", timeout=5)
-                        inject.sendline(SUDO)
-                        inject.expect([r"# ", r"\$ "], timeout=5)
-                        SUDOAUTH = True
-                        print("Sudo authenticated successfully")
-                    except Exception as E:
-                        print("sudError: ", E)
-                        SUDOAUTH = False
-            
-            # Only send the command if sudo auth succeeded (or wasn't needed)
-            if not SUDOAUTH:
-                print("Skipping command, not authenticated")
-                continue
-
-            if system == "Windows":
-                inject.sendline(cmd)
-                inject.expect(r">", timeout=5)
             else:
-                inject.sendline(cmd)
-                inject.expect([r"# ", r"\$ "], timeout=5)
-            
-            STDOUT = inject.before.split("\r\n", 1)[-1]
-            STDOUT = ansi_escape.sub('', STDOUT).strip()
-            if JSONFLAG:
-                JSON, index = JSONDECODER.raw_decode(STDOUT)
-                JSONFLAG = False
+                # ----- Windows / Linux path: use pexpect inject (ORIGINAL CODE) -----
+                # Authenticate sudo ONCE at the start, not for every command
+                if not SUDOAUTH:
+                    if system == "Windows":
+                        # Windows doesn't use sudo in the same way; 
+                        # for now, we assume the process has necessary rights
+                        # or we could implement runas logic here.
+                        SUDOAUTH = True 
+                        print("Windows shell initialized")
+                    else:
+                        try:
+                            print(f"SUDO not detected on {system}! Injecting...")
+                            inject.sendline("sudo -s")
+                            inject.expect(r"[Pp]assword", timeout=5)
+                            inject.sendline(SUDO)
+                            # Mac/Linux prompts might differ; # is common for root
+                            inject.expect([r"# ", r"\$ "], timeout=5)
+                            SUDOAUTH = True
+                            print("Sudo authenticated successfully")
+                        except Exception as E:
+                            print("sudError: ", E)
+                            SUDOAUTH = False
+                
+                # Only send the command
+                if system == "Windows":
+                    # For Windows commands, we might need a different echo or prompt check
+                    inject.sendline(cmd)
+                    # cmd.exe usually ends with >
+                    inject.expect(r">", timeout=5)
+                else:
+                    inject.sendline(cmd)
+                    inject.expect([r"# ", r"\$ "], timeout=5)
+                
+                STDOUT = inject.before.split("\r\n", 1)[-1]
+                STDOUT = ansi_escape.sub('', STDOUT).strip()
+                if JSONFLAG == True:
+                    JSON, index = JSONDECODER.raw_decode(STDOUT)
+                    JSONFLAG = False
 
         except Exception as e:
             print("Worker error:", e)
@@ -282,35 +282,68 @@ def refreshnet():
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
-        
-        # Check Health - it may be a list or a string depending on the state
-        health = JSON.get("Health", [])
-        if isinstance(health, list):
-            health_stopped = any("stopped" in str(h).lower() for h in health)
-        else:
-            health_stopped = "stopped" in str(health).lower()
-        
-        if health_stopped or JSON.get("BackendState") == "Stopped":
-            print("tailscale service stopped... restarting...")
-            cmd_queue.put("tailscale up")
-            cmd_queue.join()
-            JSONFLAG = True
-            cmd_queue.put("tailscale status --json")
-            cmd_queue.join()
-        
-        current_tailnet = JSON.get("CurrentTailnet")
-        if current_tailnet:
-            TAILNAME = current_tailnet.get("Name", "")
+        if system == "Darwin":
+            # ----- macOS path: custom json handling without jq -----
+            # Check Health - it may be a list or a string depending on the state
+            health = JSON.get("Health", [])
+            if isinstance(health, list):
+                health_stopped = any("stopped" in str(h).lower() for h in health)
+            else:
+                health_stopped = "stopped" in str(health).lower()
+            
+            if health_stopped or JSON.get("BackendState") == "Stopped":
+                print("tailscale service stopped... restarting...")
+                cmd_queue.put("tailscale up")
+                cmd_queue.join()
+                JSONFLAG = True
+                cmd_queue.put("tailscale status --json")
+                cmd_queue.join()
+            
+            current_tailnet = JSON.get("CurrentTailnet")
+            if current_tailnet:
+                TAILNAME = current_tailnet.get("Name", "")
 
-        ## Parse peers from JSON directly instead of using jq (cross-platform)
-        peers = JSON.get("Peer") or {}
-        for peer_key, peer_data in peers.items():
-            hostname = peer_data.get("HostName", "")
-            ips = peer_data.get("TailscaleIPs", [])
-            if hostname and ips:
-                DEVICES[hostname] = ips[0]
-        
-        print(f"{len(DEVICES)} device(s) found")
+            ## Parse peers from JSON directly instead of using jq (cross-platform)
+            peers = JSON.get("Peer") or {}
+            for peer_key, peer_data in peers.items():
+                hostname = peer_data.get("HostName", "")
+                ips = peer_data.get("TailscaleIPs", [])
+                if hostname and ips:
+                    DEVICES[hostname] = ips[0]
+            
+            print(f"{len(DEVICES)} device(s) found")
+        else:
+            # ----- Windows / Linux path (ORIGINAL CODE) -----
+            if "Tailscale is stopped." in JSON["Health"]:
+                print("tailscale service stopped... restarting...")
+                cmd_queue.put("tailscale up")
+                JSONFLAG = True
+                cmd_queue.put("tailscale status --json")
+                cmd_queue.join()
+            TAILNAME = (JSON["CurrentTailnet"])["Name"]
+
+            ##COMMAND SPECIFIC
+
+            cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
+            cmd_queue.join()
+
+            STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
+
+            for char in "\r\n":
+                STDOUT = STDOUT.replace(char, " ")
+            assembly = STDOUT.split()
+            toggle = 1
+            obj1 = ""
+            obj2 = ""
+
+            for object in assembly:
+                if toggle == 1:
+                    toggle = 2
+                    obj1 = object
+                elif toggle == 2:
+                    toggle = 1
+                    obj2 = object
+                    DEVICES[obj1] = obj2
     except Exception as e:
         print("Error:", e)
 

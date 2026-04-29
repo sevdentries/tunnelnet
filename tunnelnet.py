@@ -304,12 +304,23 @@ def refreshnet():
                 TAILNAME = current_tailnet.get("Name", "")
 
             ## Parse peers from JSON directly instead of using jq (cross-platform)
+            # 1. Grab other peers on the network
             peers = JSON.get("Peer") or {}
             for peer_key, peer_data in peers.items():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
                 if hostname and ips:
                     DEVICES[hostname] = ips[0]
+            
+            # 2. Grab the local device (Self)
+            self_node = JSON.get("Self")
+            if self_node:
+                self_hostname = self_node.get("HostName", "")
+                self_ips = self_node.get("TailscaleIPs", [])
+                if self_hostname and self_ips:
+                    SELF[self_hostname] = self_ips[0]
+                    # Also add Self to the devices list so it's logged/visible
+                    DEVICES[self_hostname] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
         else:

@@ -12,7 +12,6 @@ CHATBG = "#2C2E31"
 TEXTBG = "#32363B"
 SELECTBG = "#6C727C"
 SERVERBG = "#202124"
-DEVICES = {'banana', 'apple', 'user1', 'gchen'}
 
 # Variables
 # placeholder
@@ -79,10 +78,18 @@ logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
 
-userlabel = tk.Label(profileframe, text="Welcome, User", font=("Arial", 10))
+SELF = {
+    "johnhuman233-github": "192.168.0.1"
+}
+
+for user, ip in SELF.items():
+    selfname = str(user)
+    selfip = str(ip)
+
+userlabel = tk.Label(profileframe, text=f"Welcome, {selfname}", font=("Arial", 10))
 userlabel.grid(column=1, row=1)
 
-IPlabel = tk.Label(profileframe, text="Logged in from IP...", font=("Arial", 10))
+IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10))
 IPlabel.grid(column=1, row=2)
 
 # Server frame (users and other online people); part of Profileframe
@@ -90,19 +97,31 @@ serverframe = tk.Frame(profileframe, bg=SERVERBG)
 serverframe.grid(column=0, row=3, columnspan=3, sticky='nsew')
 serverframe.grid_columnconfigure(0, weight=1)
 serverframe.grid_columnconfigure(1, weight=3)
-serverframe.grid_columnconfigure(2, weight=0)
+serverframe.grid_columnconfigure(2, weight=3)
 serverframe.grid_rowconfigure(0, weight=1)
-serverframe.grid_rowconfigure(1, weight=5)
-serverframe.grid_rowconfigure(2, weight=5)
-serverframe.grid_rowconfigure(3, weight=5)
+for i in range(100):
+    serverframe.grid_rowconfigure(i+1, weight=2)
 
 usertitlelabel = tk.Label(serverframe, text='Users', font=100)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
-devices_list = list(DEVICES)
-for i in range(len(devices_list)):
-    devicelabel = tk.Label(serverframe, text=str(devices_list[i]), font=40)
-    devicelabel.grid(column=1, row=i)
+DEVICES = {
+    "laptop-1": "100.101.102.103",
+    "phone-1": "100.104.105.106",
+    "laptop-2": "256.101.102.103",
+    "phone-2": "103.104.105.106",
+    "laptop-3": "196.168.102.103",
+    "phone-3": "1.1.1.1",
+    }
+
+DEVICErow = 1
+for user, ip in DEVICES.items():
+    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+    DEVICElabel.grid(column=1, row=DEVICErow, sticky="w")
+
+    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+    IPDEVICElabel.grid(column=2, row=DEVICErow, sticky="w")
+    DEVICErow += 1
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)

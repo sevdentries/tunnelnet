@@ -10,6 +10,22 @@ import webbrowser
 import sys
 from urllib.request import urlopen
 from pathlib import Path
+
+# On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
+# macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
+import _tkinter
+_tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
+if platform.system() == "Darwin" and _tk_ver < (8, 6):
+    print("=" * 60)
+    print("ERROR: Your Python's Tk version is too old for this macOS.")
+    print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
+    print(f"  Python: {sys.executable} ({sys.version.split()[0]})")
+    print()
+    print("  Fix: Install Python 3.10+ from https://python.org")
+    print("  Then run: python3.13 tunnelnet.py")
+    print("=" * 60)
+    sys.exit(1)
+
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk
@@ -56,14 +72,18 @@ DEVICES = {}
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
-if system == "Windows":
+if system == "Darwin":
+    # macOS: use subprocess instead of pexpect — no sudo needed,
+    # and pexpect + zsh mangles multi-line output (bracketed paste, ANSI codes).
+    inject = None
+elif system == "Windows":
     try:
         from pexpect.popen_spawn import PopenSpawn
         inject = PopenSpawn("cmd.exe", encoding="utf-8")
     except (ImportError, Exception):
         inject = None
 else:
-    shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
+    shell_path = "/bin/bash"
     inject = pexpect.spawn(shell_path, encoding="utf-8")
 
 if inject:
@@ -167,6 +187,25 @@ def bash_worker():
         if cmd is None:
             break
         try:
+            # ----- macOS path: use subprocess (no sudo, clean output) -----
+            if system == "Darwin":
+                if not SUDOAUTH:
+                    SUDOAUTH = True
+                    print("macOS shell initialized (no sudo needed)")
+                
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=30
+                )
+                STDOUT = result.stdout.strip()
+                if result.returncode != 0 and result.stderr:
+                    print(f"cmd stderr: {result.stderr.strip()}")
+                
+                if JSONFLAG:
+                    JSON = json.loads(STDOUT)
+                    JSONFLAG = False
+                continue
+            
+            # ----- Windows / Linux path: use pexpect inject -----
             # Authenticate sudo ONCE at the start, not for every command
             if not SUDOAUTH:
                 if system == "Windows":
@@ -181,7 +220,6 @@ def bash_worker():
                         inject.sendline("sudo -s")
                         inject.expect(r"[Pp]assword", timeout=5)
                         inject.sendline(SUDO)
-                        # Mac/Linux prompts might differ; # is common for root
                         inject.expect([r"# ", r"\$ "], timeout=5)
                         SUDOAUTH = True
                         print("Sudo authenticated successfully")
@@ -189,11 +227,13 @@ def bash_worker():
                         print("sudError: ", E)
                         SUDOAUTH = False
             
-            # Only send the command
+            # Only send the command if sudo auth succeeded (or wasn't needed)
+            if not SUDOAUTH:
+                print("Skipping command, not authenticated")
+                continue
+
             if system == "Windows":
-                # For Windows commands, we might need a different echo or prompt check
                 inject.sendline(cmd)
-                # cmd.exe usually ends with >
                 inject.expect(r">", timeout=5)
             else:
                 inject.sendline(cmd)
@@ -201,7 +241,7 @@ def bash_worker():
             
             STDOUT = inject.before.split("\r\n", 1)[-1]
             STDOUT = ansi_escape.sub('', STDOUT).strip()
-            if JSONFLAG == True:
+            if JSONFLAG:
                 JSON, index = JSONDECODER.raw_decode(STDOUT)
                 JSONFLAG = False
 
@@ -228,37 +268,35 @@ def refreshnet():
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
-        if "Tailscale is stopped." in JSON["Health"]:
+        
+        # Check Health - it may be a list or a string depending on the state
+        health = JSON.get("Health", [])
+        if isinstance(health, list):
+            health_stopped = any("stopped" in str(h).lower() for h in health)
+        else:
+            health_stopped = "stopped" in str(health).lower()
+        
+        if health_stopped or JSON.get("BackendState") == "Stopped":
             print("tailscale service stopped... restarting...")
             cmd_queue.put("tailscale up")
+            cmd_queue.join()
             JSONFLAG = True
             cmd_queue.put("tailscale status --json")
             cmd_queue.join()
-        TAILNAME = (JSON["CurrentTailnet"])["Name"]
+        
+        current_tailnet = JSON.get("CurrentTailnet")
+        if current_tailnet:
+            TAILNAME = current_tailnet.get("Name", "")
 
-        ##COMMAND SPECIFIC
-
-        cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
-        cmd_queue.join()
-
-        STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
-
-        for char in "\r\n":
-            STDOUT = STDOUT.replace(char, " ")
-        assembly = STDOUT.split()
-        toggle = 1
-        obj1 = ""
-        obj2 = ""
-
-        for object in assembly:
-            if toggle == 1:
-                toggle = 2
-                obj1 = object
-            elif toggle == 2:
-                toggle = 1
-                obj2 = object
-                DEVICES[obj1] = obj2
-        print(len(DEVICES))
+        ## Parse peers from JSON directly instead of using jq (cross-platform)
+        peers = JSON.get("Peer") or {}
+        for peer_key, peer_data in peers.items():
+            hostname = peer_data.get("HostName", "")
+            ips = peer_data.get("TailscaleIPs", [])
+            if hostname and ips:
+                DEVICES[hostname] = ips[0]
+        
+        print(f"{len(DEVICES)} device(s) found")
     except Exception as e:
         print("Error:", e)
 
@@ -343,12 +381,25 @@ def messaging_service():
     Handles sending, receiving, and acknowledging messages.
     """
     def listener():
-        # TCP Listener Thread
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind(('0.0.0.0', MESG_PORT))
-            s.listen()
-            print(f"Messaging listener started on port {MESG_PORT}")
+        # TCP Listener Thread — retry bind in case port is in TIME_WAIT
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, 'SO_REUSEPORT'):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        for attempt in range(5):
+            try:
+                s.bind(('0.0.0.0', MESG_PORT))
+                break
+            except OSError:
+                if attempt < 4:
+                    print(f"Port {MESG_PORT} busy, retrying in 2s... ({attempt+1}/5)")
+                    time.sleep(2)
+                else:
+                    print(f"Could not bind port {MESG_PORT} after 5 attempts")
+                    return
+        s.listen()
+        print(f"Messaging listener started on port {MESG_PORT}")
+        with s:
             while True:
                 conn, addr = s.accept()
                 with conn:
@@ -454,29 +505,51 @@ def sendMessage():
         entrytextlabel.grid(column=0, sticky='w')
         textbox.delete(0, tk.END)
 
-# Image loading
-bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
-logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
+# Image loading — try local Assets first, then fall back to URL
+bgimgraw = None
+logoimgraw = None
+_assets_dir = Path(__file__).resolve().parent / "Assets"
+
+# Try local files first
 try:
-    with urlopen(bgimglink) as img1:
-        bgimgraw = img1.read()
-    with urlopen(logoimglink) as img2:
-        logoimgraw = img2.read()
-except Exception as linkerror: 
-    print("Fetch logo failed", str(linkerror))
+    with open(_assets_dir / "computerBackground.png", "rb") as f:
+        bgimgraw = f.read()
+    with open(_assets_dir / "tunnel.png", "rb") as f:
+        logoimgraw = f.read()
+except FileNotFoundError:
+    print("Local assets not found, trying URL...")
 
-# Images variables
-bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
-bgimg = bgimgdata.zoom(1,1)
-bgimg = bgimgdata.subsample(1,5)
-# bgimg = tk.PhotoImage(file='link') # code for file with correct dimensions.
+# Fall back to URL if local files weren't found
+if bgimgraw is None or logoimgraw is None:
+    bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
+    logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
+    try:
+        if bgimgraw is None:
+            with urlopen(bgimglink) as img1:
+                bgimgraw = img1.read()
+        if logoimgraw is None:
+            with urlopen(logoimglink) as img2:
+                logoimgraw = img2.read()
+    except Exception as linkerror:
+        print("Fetch logo failed:", str(linkerror))
 
-logoimgdata = tk.PhotoImage(data=logoimgraw)
-logoimg = logoimgdata.subsample(5,5)
+# Images variables — handle case where images couldn't be loaded
+bgimg = None
+logoimg = None
+try:
+    if bgimgraw:
+        bgimgdata = tk.PhotoImage(data=bgimgraw)
+        bgimg = bgimgdata.subsample(1, 5)
+    if logoimgraw:
+        logoimgdata = tk.PhotoImage(data=logoimgraw)
+        logoimg = logoimgdata.subsample(5, 5)
+except Exception as imgerr:
+    print(f"Image processing error: {imgerr}")
 
 # Background Image
-bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
-bgimglabel.grid(column=0, row=0, columnspan=2)
+if bgimg:
+    bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
+    bgimglabel.grid(column=0, row=0, columnspan=2)
 
 # Profile frame (all of left) 
 profileframe = tk.Frame(main, bg=PROFILEBG)
@@ -486,8 +559,9 @@ profileframe.grid_columnconfigure(1, weight=1)
 profileframe.grid_rowconfigure(0, weight=0)
 profileframe.grid_rowconfigure(1, weight=1)
 
-logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
-logoimglabel.grid(column=0, row=0, padx=20, pady=20)
+if logoimg:
+    logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
+    logoimglabel.grid(column=0, row=0, padx=20, pady=20)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)
@@ -562,6 +636,22 @@ if system == "Linux":
     authentry.pack()
     authbutton.pack()
     root.withdraw()
+
+elif system == "Darwin":
+    # macOS doesn't need sudo for Tailscale — the Mac app handles permissions.
+    # Auto-authenticate and check if tailscale is already running.
+    SUDOAUTH = True
+    JSONFLAG = True
+    cmd_queue.put("tailscale status --json")
+    cmd_queue.join()
+    try:
+        if JSON.get("BackendState") == "Running":
+            initialize.add(softlogtab, text="Soft Login")
+            softloglabel.grid(row=0, column=1, sticky=NSEW)
+            softloglabel2.grid(row=1, column=1, sticky=NSEW)
+            softlogbutton.grid(row=2, column=1, sticky=NSEW)
+    except Exception as e:
+        print(f"Mac auto-check error: {e}")
 
 
 joinlabel.grid(column=1, row=0 ,sticky=NSEW)

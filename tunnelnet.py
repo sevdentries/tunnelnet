@@ -56,8 +56,19 @@ if platform.system() == "Darwin":
                     print("Please run manually (e.g. 'python3.13 tunnelnet.py')")
                     sys.exit(1)
             except Exception as e:
-                print(f"\nAuto-install failed: {e}")
-                print("Please install Python 3.10+ from https://python.org manually.")
+                print(f"\nBrew install failed or Homebrew is missing: {e}")
+                print("Falling back to the official Python macOS installer...")
+                try:
+                    pkg_url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
+                    pkg_path = "/tmp/python-3.13.0.pkg"
+                    print(f"Downloading Python 3.13... This might take a moment.")
+                    subprocess.run(f"curl -L -s -o {pkg_path} {pkg_url}", shell=True, check=True)
+                    print("Opening the installer! Please click through the setup.")
+                    print("Once it finishes installing, just run this script again.")
+                    subprocess.run(f"open {pkg_path}", shell=True)
+                except Exception as dl_error:
+                    print(f"Failed to download installer: {dl_error}")
+                    print("Please install Python manually from https://python.org")
                 sys.exit(1)
 
 from tkinter import *

@@ -301,7 +301,11 @@ def bash_worker():
                     print(f"cmd stderr: {result.stderr.strip()}")
                 
                 if JSONFLAG:
-                    JSON = json.loads(STDOUT)
+                    try:
+                        JSON = json.loads(STDOUT)
+                    except (json.JSONDecodeError, ValueError):
+                        JSON = {}
+                        print("Warning: tailscale returned non-JSON output")
                     JSONFLAG = False
                 continue
             else:
@@ -788,7 +792,7 @@ elif system == "Darwin":
     cmd_queue.put("tailscale status --json")
     cmd_queue.join()
     try:
-        if JSON.get("BackendState") == "Running":
+        if isinstance(JSON, dict) and JSON.get("BackendState") == "Running":
             initialize.add(softlogtab, text="Soft Login")
             softloglabel.grid(row=0, column=1, sticky=NSEW)
             softloglabel2.grid(row=1, column=1, sticky=NSEW)

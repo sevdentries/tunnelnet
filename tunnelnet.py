@@ -1,14 +1,15 @@
 import platform 
 import sys
 import os
-import shutil
 import subprocess
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
 # If we detect old Tk, relaunch with a newer Python via subprocess (not os.execv,
 # which breaks in IDEs that capture stdout).
+# Also auto-install missing pip packages on Mac since there is no linuxinstall.sh.
 if platform.system() == "Darwin":
+    import shutil
     import _tkinter
     _tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
     if _tk_ver < (8, 6):
@@ -65,23 +66,54 @@ if platform.system() == "Darwin":
                     print("Please install Python manually from https://python.org")
                 sys.exit(1)
 
-# Auto-install missing pip packages before importing them.
-# This handles the case where the script is run with a Python that
-# doesn't have requests/pexpect installed (e.g. system Python 3.9).
-def _ensure_packages(*packages):
-    missing = []
-    for pkg in packages:
+    # macOS: auto-install missing pip packages (no linuxinstall.sh on Mac)
+    import importlib, site
+    _mac_missing = []
+    for _pkg in ("requests", "pexpect"):
         try:
-            __import__(pkg)
+            __import__(_pkg)
         except ImportError:
-            missing.append(pkg)
-    if missing:
-        print(f"Installing missing packages: {', '.join(missing)}...")
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--user", "-q"] + missing
-        )
-
-_ensure_packages("requests", "pexpect")
+            _mac_missing.append(_pkg)
+    if _mac_missing:
+        print(f"Missing packages detected: {', '.join(_mac_missing)}")
+        try:
+            print("  Attempting pip install...")
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--user", "-q"] + _mac_missing,
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            try:
+                print("  pip not found, bootstrapping via ensurepip...")
+                subprocess.check_call(
+                    [sys.executable, "-m", "ensurepip", "--user", "--default-pip"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--user", "-q"] + _mac_missing,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+            except Exception:
+                pass
+        # Make sure Python can find the newly installed packages
+        _user_site = site.getusersitepackages()
+        if isinstance(_user_site, str) and _user_site not in sys.path:
+            sys.path.insert(0, _user_site)
+        importlib.invalidate_caches()
+        # Final check
+        _still_missing = []
+        for _pkg in _mac_missing:
+            try:
+                __import__(_pkg)
+            except ImportError:
+                _still_missing.append(_pkg)
+        if _still_missing:
+            print("=" * 60)
+            print(f"ERROR: Could not install: {', '.join(_still_missing)}")
+            print("  Run:  pip3 install " + " ".join(_still_missing))
+            print("  Then re-run this script.")
+            print("=" * 60)
+            sys.exit(1)
 
 import requests
 import shlex

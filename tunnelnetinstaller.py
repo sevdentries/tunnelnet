@@ -38,6 +38,13 @@ elif system == "Darwin":
         print(f"Running: {tk_install_cmd}")
         subprocess.run(tk_install_cmd, shell=True, check=False)
         print("Tkinter installation attempt finished.")
+        
+        # Install required python packages
+        print("Installing required Python packages...")
+        pip_install_cmd = "python3 -m pip install requests pexpect"
+        print(f"Running: {pip_install_cmd}")
+        subprocess.run(pip_install_cmd, shell=True, check=False)
+        print("Python packages installation attempt finished.")
     except Exception as e:
         print(f"Error during Mac installation: {e}")
 

@@ -1,15 +1,8 @@
 import platform 
-import requests
-import shlex
-import subprocess
-import atexit
-import threading
-import queue
-import warnings
-import webbrowser
 import sys
-from urllib.request import urlopen
-from pathlib import Path
+import os
+import shutil
+import subprocess
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
@@ -18,7 +11,6 @@ if platform.system() == "Darwin":
     import _tkinter
     _tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
     if _tk_ver < (8, 6):
-        import shutil, os
         # Look for a newer Python that has Tk 8.6+
         _candidates = ["python3.13", "python3.12", "python3.11", "python3.10"]
         _new_python = None
@@ -36,7 +28,6 @@ if platform.system() == "Darwin":
             print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
             print("  Attempting to auto-install a newer Tkinter via Homebrew...")
             print("=" * 60)
-            import subprocess
             try:
                 # Install python-tk which provides Tk 8.6+ on Mac
                 subprocess.run("brew install python-tk", shell=True, check=True)
@@ -70,6 +61,16 @@ if platform.system() == "Darwin":
                     print(f"Failed to download installer: {dl_error}")
                     print("Please install Python manually from https://python.org")
                 sys.exit(1)
+
+import requests
+import shlex
+import atexit
+import threading
+import queue
+import warnings
+import webbrowser
+from urllib.request import urlopen
+from pathlib import Path
 
 from tkinter import *
 from tkinter import ttk

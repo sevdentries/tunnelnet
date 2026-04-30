@@ -31,6 +31,13 @@ elif system == "Darwin":
         print(f"Running: {install_cmd}")
         subprocess.run(install_cmd, shell=True, check=True)
         print("Tailscale installation attempt finished.")
+        
+        # Install python-tk to ensure Tk 8.6+ is available on macOS
+        print("Installing python-tk to provide Tkinter 8.6+...")
+        tk_install_cmd = "brew install python-tk"
+        print(f"Running: {tk_install_cmd}")
+        subprocess.run(tk_install_cmd, shell=True, check=False)
+        print("Tkinter installation attempt finished.")
     except Exception as e:
         print(f"Error during Mac installation: {e}")
 

@@ -6,7 +6,8 @@ import subprocess
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
-# If we detect old Tk, auto-relaunch with a newer Python if available.
+# If we detect old Tk, relaunch with a newer Python via subprocess (not os.execv,
+# which breaks in IDEs that capture stdout).
 if platform.system() == "Darwin":
     import _tkinter
     _tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
@@ -20,8 +21,9 @@ if platform.system() == "Darwin":
                 _new_python = _path
                 break
         if _new_python:
-            # Re-launch quietly without printing anything unless there's an error
-            os.execv(_new_python, [_new_python] + sys.argv)
+            # Relaunch with subprocess so IDEs can follow the child process
+            result = subprocess.run([_new_python] + sys.argv)
+            sys.exit(result.returncode)
         else:
             print("=" * 60)
             print("ERROR: Your Python's Tk version is too old for this macOS.")
@@ -41,7 +43,8 @@ if platform.system() == "Darwin":
                         
                 if _new_python:
                     print(f"Successfully installed! Relaunching with {_new_python}...")
-                    os.execv(_new_python, [_new_python] + sys.argv)
+                    result = subprocess.run([_new_python] + sys.argv)
+                    sys.exit(result.returncode)
                 else:
                     print("Install finished but could not find the new Python path.")
                     print("Please run manually (e.g. 'python3.13 tunnelnet.py')")
@@ -61,6 +64,24 @@ if platform.system() == "Darwin":
                     print(f"Failed to download installer: {dl_error}")
                     print("Please install Python manually from https://python.org")
                 sys.exit(1)
+
+# Auto-install missing pip packages before importing them.
+# This handles the case where the script is run with a Python that
+# doesn't have requests/pexpect installed (e.g. system Python 3.9).
+def _ensure_packages(*packages):
+    missing = []
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        print(f"Installing missing packages: {', '.join(missing)}...")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--user", "-q"] + missing
+        )
+
+_ensure_packages("requests", "pexpect")
 
 import requests
 import shlex

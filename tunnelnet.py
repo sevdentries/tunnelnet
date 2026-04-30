@@ -34,12 +34,31 @@ if platform.system() == "Darwin":
             print("=" * 60)
             print("ERROR: Your Python's Tk version is too old for this macOS.")
             print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
-            print(f"  Python: {sys.executable} ({sys.version.split()[0]})")
-            print()
-            print("  Fix: Install Python 3.10+ from https://python.org")
-            print("  Then run: python3.13 tunnelnet.py")
+            print("  Attempting to auto-install a newer Tkinter via Homebrew...")
             print("=" * 60)
-            sys.exit(1)
+            import subprocess
+            try:
+                # Install python-tk which provides Tk 8.6+ on Mac
+                subprocess.run("brew install python-tk", shell=True, check=True)
+                
+                # Check for the newly installed Python
+                for _cand in _candidates:
+                    _path = shutil.which(_cand)
+                    if _path and os.path.realpath(_path) != os.path.realpath(sys.executable):
+                        _new_python = _path
+                        break
+                        
+                if _new_python:
+                    print(f"Successfully installed! Relaunching with {_new_python}...")
+                    os.execv(_new_python, [_new_python] + sys.argv)
+                else:
+                    print("Install finished but could not find the new Python path.")
+                    print("Please run manually (e.g. 'python3.13 tunnelnet.py')")
+                    sys.exit(1)
+            except Exception as e:
+                print(f"\nAuto-install failed: {e}")
+                print("Please install Python 3.10+ from https://python.org manually.")
+                sys.exit(1)
 
 from tkinter import *
 from tkinter import ttk

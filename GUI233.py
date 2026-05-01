@@ -110,18 +110,22 @@ DEVICES = {
     "phone-1": "100.104.105.106",
     "laptop-2": "256.101.102.103",
     "phone-2": "103.104.105.106",
+    "John's Macbook Air": "192.168.0.1",
     "laptop-3": "196.168.102.103",
     "phone-3": "1.1.1.1",
     }
 
 USERrow = 1
 for user, ip in DEVICES.items():
-    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+    if (user, ip) in SELF.items():
+        pass
+    else:
+        DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+        DEVICElabel.grid(column=1, row=USERrow, sticky="w")
 
-    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-    USERrow += 1
+        IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+        IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+        USERrow += 1
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)

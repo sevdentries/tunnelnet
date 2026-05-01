@@ -683,17 +683,25 @@ logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/head
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()
+    bgimgdata = tk.PhotoImage(data=bgimgraw)
+except:
+    bgimgraw = str(userdir.parent)+"/Assets/silly.png"
+    bgimgdata = tk.PhotoImage(file=bgimgraw)
+
+try:
     with urlopen(logoimglink) as img2:
         logoimgraw = img2.read()
-except Exception as linkerror: 
-    print("Fetch logo failed", str(linkerror))
+    logoimgdata = tk.PhotoImage(data=logoimgraw)
+except:
+    logoimgraw = str(userdir.parent)+"/Assets/silly.png"
+    logoimgdata = tk.PhotoImage(file=logoimgraw)
 
 # Images variables
-bgimgdata = tk.PhotoImage(data=bgimgraw) # code for file with any dimensions.
+ # code for file with any dimensions.
 bgimg = bgimgdata.zoom(1,1)
 bgimg = bgimgdata.subsample(1,5)
 
-logoimgdata = tk.PhotoImage(data=logoimgraw)
+
 logoimg = logoimgdata.subsample(5,5)
 
 # Background Image

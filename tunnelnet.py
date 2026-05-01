@@ -1,15 +1,130 @@
 import platform 
+import sys
+import os
+import subprocess
+
+# On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
+# macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
+# If we detect old Tk, relaunch with a newer Python via subprocess (not os.execv,
+# which breaks in IDEs that capture stdout).
+# Also auto-install missing pip packages on Mac since there is no linuxinstall.sh.
+if platform.system() == "Darwin":
+    import shutil
+    import _tkinter
+    _tk_ver = tuple(int(x) for x in _tkinter.TK_VERSION.split('.'))
+    if _tk_ver < (8, 6):
+        # Look for a newer Python that has Tk 8.6+
+        _candidates = ["python3.13", "python3.12", "python3.11", "python3.10"]
+        _new_python = None
+        for _cand in _candidates:
+            _path = shutil.which(_cand)
+            if _path and os.path.realpath(_path) != os.path.realpath(sys.executable):
+                _new_python = _path
+                break
+        if _new_python:
+            # Relaunch with subprocess so IDEs can follow the child process
+            result = subprocess.run([_new_python] + sys.argv)
+            sys.exit(result.returncode)
+        else:
+            print("=" * 60)
+            print("ERROR: Your Python's Tk version is too old for this macOS.")
+            print(f"  Found Tk {_tkinter.TK_VERSION}, need 8.6+")
+            print("  Attempting to auto-install a newer Tkinter via Homebrew...")
+            print("=" * 60)
+            try:
+                # Install python-tk which provides Tk 8.6+ on Mac
+                subprocess.run("brew install python-tk", shell=True, check=True)
+                
+                # Check for the newly installed Python
+                for _cand in _candidates:
+                    _path = shutil.which(_cand)
+                    if _path and os.path.realpath(_path) != os.path.realpath(sys.executable):
+                        _new_python = _path
+                        break
+                        
+                if _new_python:
+                    print(f"Successfully installed! Relaunching with {_new_python}...")
+                    result = subprocess.run([_new_python] + sys.argv)
+                    sys.exit(result.returncode)
+                else:
+                    print("Install finished but could not find the new Python path.")
+                    print("Please run manually (e.g. 'python3.13 tunnelnet.py')")
+                    sys.exit(1)
+            except Exception as e:
+                print(f"\nBrew install failed or Homebrew is missing: {e}")
+                print("Falling back to the official Python macOS installer...")
+                try:
+                    pkg_url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
+                    pkg_path = "/tmp/python-3.13.0.pkg"
+                    print(f"Downloading Python 3.13... This might take a moment.")
+                    subprocess.run(f"curl -L -s -o {pkg_path} {pkg_url}", shell=True, check=True)
+                    print("Opening the installer! Please click through the setup.")
+                    print("Once it finishes installing, just run this script again.")
+                    subprocess.run(f"open {pkg_path}", shell=True)
+                except Exception as dl_error:
+                    print(f"Failed to download installer: {dl_error}")
+                    print("Please install Python manually from https://python.org")
+                sys.exit(1)
+
+    # macOS: auto-install missing pip packages (no linuxinstall.sh on Mac)
+    import importlib, site
+    _mac_missing = []
+    for _pkg in ("requests", "pexpect"):
+        try:
+            __import__(_pkg)
+        except ImportError:
+            _mac_missing.append(_pkg)
+    if _mac_missing:
+        print(f"Missing packages detected: {', '.join(_mac_missing)}")
+        try:
+            print("  Attempting pip install...")
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--user", "-q"] + _mac_missing,
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            try:
+                print("  pip not found, bootstrapping via ensurepip...")
+                subprocess.check_call(
+                    [sys.executable, "-m", "ensurepip", "--user", "--default-pip"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--user", "-q"] + _mac_missing,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+            except Exception:
+                pass
+        # Make sure Python can find the newly installed packages
+        _user_site = site.getusersitepackages()
+        if isinstance(_user_site, str) and _user_site not in sys.path:
+            sys.path.insert(0, _user_site)
+        importlib.invalidate_caches()
+        # Final check
+        _still_missing = []
+        for _pkg in _mac_missing:
+            try:
+                __import__(_pkg)
+            except ImportError:
+                _still_missing.append(_pkg)
+        if _still_missing:
+            print("=" * 60)
+            print(f"ERROR: Could not install: {', '.join(_still_missing)}")
+            print("  Run:  pip3 install " + " ".join(_still_missing))
+            print("  Then re-run this script.")
+            print("=" * 60)
+            sys.exit(1)
+
 import requests
 import shlex
-import subprocess
 import atexit
 import threading
 import queue
 import warnings
 import webbrowser
-import sys
 from urllib.request import urlopen
 from pathlib import Path
+
 from tkinter import *
 from tkinter import ttk
 import tkinter as tk
@@ -56,15 +171,20 @@ DEVICES = {}
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
-if system == "Windows":
-    try:
-        from pexpect.popen_spawn import PopenSpawn
-        inject = PopenSpawn("cmd.exe", encoding="utf-8")
-    except (ImportError, Exception):
-        inject = None
+if system == "Darwin":
+    # macOS: use subprocess instead of pexpect — no sudo needed,
+    # and pexpect + zsh mangles multi-line output (bracketed paste, ANSI codes).
+    inject = None
 else:
-    shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
-    inject = pexpect.spawn(shell_path, encoding="utf-8")
+    if system == "Windows":
+        try:
+            from pexpect.popen_spawn import PopenSpawn
+            inject = PopenSpawn("cmd.exe", encoding="utf-8")
+        except (ImportError, Exception):
+            inject = None
+    else:
+        shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
+        inject = pexpect.spawn(shell_path, encoding="utf-8")
 
 if inject:
     inject.logfile = sys.stdout
@@ -167,43 +287,66 @@ def bash_worker():
         if cmd is None:
             break
         try:
-            # Authenticate sudo ONCE at the start, not for every command
-            if not SUDOAUTH:
-                if system == "Windows":
-                    # Windows doesn't use sudo in the same way; 
-                    # for now, we assume the process has necessary rights
-                    # or we could implement runas logic here.
-                    SUDOAUTH = True 
-                    print("Windows shell initialized")
-                else:
+            # ----- macOS path: use subprocess (no sudo, clean output) -----
+            if system == "Darwin":
+                if not SUDOAUTH:
+                    SUDOAUTH = True
+                    print("macOS shell initialized (no sudo needed)")
+                
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=30
+                )
+                STDOUT = result.stdout.strip()
+                if result.returncode != 0 and result.stderr:
+                    print(f"cmd stderr: {result.stderr.strip()}")
+                
+                if JSONFLAG:
                     try:
-                        print(f"SUDO not detected on {system}! Injecting...")
-                        inject.sendline("sudo -s")
-                        inject.expect(r"[Pp]assword", timeout=5)
-                        inject.sendline(SUDO)
-                        # Mac/Linux prompts might differ; # is common for root
-                        inject.expect([r"# ", r"\$ "], timeout=5)
-                        SUDOAUTH = True
-                        print("Sudo authenticated successfully")
-                    except Exception as E:
-                        print("sudError: ", E)
-                        SUDOAUTH = False
-            
-            # Only send the command
-            if system == "Windows":
-                # For Windows commands, we might need a different echo or prompt check
-                inject.sendline(cmd)
-                # cmd.exe usually ends with >
-                inject.expect(r">", timeout=5)
+                        JSON = json.loads(STDOUT)
+                    except (json.JSONDecodeError, ValueError):
+                        JSON = {}
+                        print("Warning: tailscale returned non-JSON output")
+                    JSONFLAG = False
+                continue
             else:
-                inject.sendline(cmd)
-                inject.expect([r"# ", r"\$ "], timeout=5)
-            
-            STDOUT = inject.before.split("\r\n", 1)[-1]
-            STDOUT = ansi_escape.sub('', STDOUT).strip()
-            if JSONFLAG == True:
-                JSON, index = JSONDECODER.raw_decode(STDOUT)
-                JSONFLAG = False
+                # ----- Windows / Linux path: use pexpect inject (ORIGINAL CODE) -----
+                # Authenticate sudo ONCE at the start, not for every command
+                if not SUDOAUTH:
+                    if system == "Windows":
+                        # Windows doesn't use sudo in the same way; 
+                        # for now, we assume the process has necessary rights
+                        # or we could implement runas logic here.
+                        SUDOAUTH = True 
+                        print("Windows shell initialized")
+                    else:
+                        try:
+                            print(f"SUDO not detected on {system}! Injecting...")
+                            inject.sendline("sudo -s")
+                            inject.expect(r"[Pp]assword", timeout=5)
+                            inject.sendline(SUDO)
+                            # Mac/Linux prompts might differ; # is common for root
+                            inject.expect([r"# ", r"\$ "], timeout=5)
+                            SUDOAUTH = True
+                            print("Sudo authenticated successfully")
+                        except Exception as E:
+                            print("sudError: ", E)
+                            SUDOAUTH = False
+                
+                # Only send the command
+                if system == "Windows":
+                    # For Windows commands, we might need a different echo or prompt check
+                    inject.sendline(cmd)
+                    # cmd.exe usually ends with >
+                    inject.expect(r">", timeout=5)
+                else:
+                    inject.sendline(cmd)
+                    inject.expect([r"# ", r"\$ "], timeout=5)
+                
+                STDOUT = inject.before.split("\r\n", 1)[-1]
+                STDOUT = ansi_escape.sub('', STDOUT).strip()
+                if JSONFLAG == True:
+                    JSON, index = JSONDECODER.raw_decode(STDOUT)
+                    JSONFLAG = False
 
         except Exception as e:
             print("Worker error:", e)
@@ -228,41 +371,102 @@ def refreshnet():
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
-        if "Tailscale is stopped." in JSON["Health"]:
-            print("tailscale service stopped... restarting...")
-            cmd_queue.put("tailscale up")
-            JSONFLAG = True
-            cmd_queue.put("tailscale status --json")
+        if system == "Darwin":
+            # ----- macOS path: custom json handling without jq -----
+            # Check Health - it may be a list or a string depending on the state
+            health = JSON.get("Health", [])
+            if isinstance(health, list):
+                health_stopped = any("stopped" in str(h).lower() for h in health)
+            else:
+                health_stopped = "stopped" in str(health).lower()
+            
+            if health_stopped or JSON.get("BackendState") == "Stopped":
+                print("tailscale service stopped... restarting...")
+                cmd_queue.put("tailscale up")
+                cmd_queue.join()
+                JSONFLAG = True
+                cmd_queue.put("tailscale status --json")
+                cmd_queue.join()
+            
+            current_tailnet = JSON.get("CurrentTailnet")
+            if current_tailnet:
+                TAILNAME = current_tailnet.get("Name", "")
+
+            ## Parse peers from JSON directly instead of using jq (cross-platform)
+            # 1. Grab other peers on the network
+            peers = JSON.get("Peer") or {}
+            for peer_key, peer_data in peers.items():
+                hostname = peer_data.get("HostName", "")
+                ips = peer_data.get("TailscaleIPs", [])
+                if hostname and ips:
+                    DEVICES[hostname] = ips[0]
+            
+            # 2. Grab the local device (Self)
+            self_node = JSON.get("Self")
+            if self_node:
+                self_hostname = self_node.get("HostName", "")
+                self_ips = self_node.get("TailscaleIPs", [])
+                if self_hostname and self_ips:
+                    SELF[self_hostname] = self_ips[0]
+                    # Also add Self to the devices list so it's logged/visible
+                    DEVICES[self_hostname] = self_ips[0]
+            
+            print(f"{len(DEVICES)} device(s) found")
+        else:
+            # ----- Windows / Linux path (ORIGINAL CODE) -----
+            if "Tailscale is stopped." in JSON["Health"]:
+                print("tailscale service stopped... restarting...")
+                cmd_queue.put("tailscale up")
+                JSONFLAG = True
+                cmd_queue.put("tailscale status --json")
+                cmd_queue.join()
+            TAILNAME = (JSON["CurrentTailnet"])["Name"]
+
+            ##COMMAND SPECIFIC
+
+            cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
             cmd_queue.join()
-        TAILNAME = (JSON["CurrentTailnet"])["Name"]
 
-        ##COMMAND SPECIFIC
+            STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
 
-        cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
-        cmd_queue.join()
+            for char in "\r\n":
+                STDOUT = STDOUT.replace(char, " ")
+            assembly = STDOUT.split()
+            toggle = 1
+            obj1 = ""
+            obj2 = ""
 
-        STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
+            for object in assembly:
+                if toggle == 1:
+                    toggle = 2
+                    obj1 = object
+                elif toggle == 2:
+                    toggle = 1
+                    obj2 = object
+                    DEVICES[obj1] = obj2
+            print(len(DEVICES))
+    
+        # Device name and IP update
+        for user, ip in SELF.items():
+            selfname = str(user)
+            selfip = str(ip)
+            userlabel.config(text=f"Welcome, {selfname}")
+            IPlabel.config(text=f"Logged in from IP {selfip}")
 
-        for char in "\r\n":
-            STDOUT = STDOUT.replace(char, " ")
-        assembly = STDOUT.split()
-        toggle = 1
-        obj1 = ""
-        obj2 = ""
+        USERrow = 1
+        for user, ip in DEVICES.items():
+            if (user, ip) in SELF.items():
+                pass
+            else:
+                DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+                DEVICElabel.grid(column=1, row=USERrow, sticky="w")
 
-        for object in assembly:
-            if toggle == 1:
-                toggle = 2
-                obj1 = object
-            elif toggle == 2:
-                toggle = 1
-                obj2 = object
-                DEVICES[obj1] = obj2
-        print(len(DEVICES))
+                IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+                USERrow += 1
+
     except Exception as e:
         print("Error:", e)
-
-    
 
 def requesttoken(cid, cs):
     '''
@@ -343,12 +547,25 @@ def messaging_service():
     Handles sending, receiving, and acknowledging messages.
     """
     def listener():
-        # TCP Listener Thread
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind(('0.0.0.0', MESG_PORT))
-            s.listen()
-            print(f"Messaging listener started on port {MESG_PORT}")
+        # TCP Listener Thread — retry bind in case port is in TIME_WAIT
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, 'SO_REUSEPORT'):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        for attempt in range(5):
+            try:
+                s.bind(('0.0.0.0', MESG_PORT))
+                break
+            except OSError:
+                if attempt < 4:
+                    print(f"Port {MESG_PORT} busy, retrying in 2s... ({attempt+1}/5)")
+                    time.sleep(2)
+                else:
+                    print(f"Could not bind port {MESG_PORT} after 5 attempts")
+                    return
+        s.listen()
+        print(f"Messaging listener started on port {MESG_PORT}")
+        with s:
             while True:
                 conn, addr = s.accept()
                 with conn:
@@ -444,6 +661,11 @@ TEXTBG = "#32363B"
 SELECTBG = "#6C727C"
 SERVERBG = "#202124"
 
+# Variables
+global selfname, selfip
+selfname = 'User' # placeholder value to prevent NameError
+selfip = '...' # placeholder value to prevent NameError
+
 # Commands
 def sendMessage():
     message = textbox.get().strip()
@@ -495,10 +717,10 @@ logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
 
-userlabel = tk.Label(profileframe, text="Welcome, User", font=("Arial", 10))
+userlabel = tk.Label(profileframe, text=f"Welcome, {selfname}", font=("Arial", 10))
 userlabel.grid(column=1, row=1)
 
-IPlabel = tk.Label(profileframe, text="Logged in from IP...", font=("Arial", 10))
+IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10))
 IPlabel.grid(column=1, row=2)
 
 # Server frame (users and other online people); part of Profileframe
@@ -506,13 +728,12 @@ serverframe = tk.Frame(profileframe, bg=SERVERBG)
 serverframe.grid(column=0, row=3, columnspan=3, sticky='nsew')
 serverframe.grid_columnconfigure(0, weight=1)
 serverframe.grid_columnconfigure(1, weight=3)
-serverframe.grid_columnconfigure(2, weight=0)
+serverframe.grid_columnconfigure(2, weight=3)
 serverframe.grid_rowconfigure(0, weight=1)
-serverframe.grid_rowconfigure(1, weight=5)
-serverframe.grid_rowconfigure(2, weight=5)
-serverframe.grid_rowconfigure(3, weight=5)
+for i in range(100):
+    serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users', font=100)
+usertitlelabel = tk.Label(serverframe, text='Users Online', font=200)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
 # Chat frame (all of right) 
@@ -619,6 +840,21 @@ if system == "Linux":
     authbutton.pack()
     root.withdraw()
 
+elif system == "Darwin":
+    # macOS doesn't need sudo for Tailscale — the Mac app handles permissions.
+    # Auto-authenticate and check if tailscale is already running.
+    SUDOAUTH = True
+    JSONFLAG = True
+    cmd_queue.put("tailscale status --json")
+    cmd_queue.join()
+    try:
+        if isinstance(JSON, dict) and JSON.get("BackendState") == "Running":
+            initialize.add(softlogtab, text="Soft Login")
+            softloglabel.grid(row=0, column=1, sticky=NSEW)
+            softloglabel2.grid(row=1, column=1, sticky=NSEW)
+            softlogbutton.grid(row=2, column=1, sticky=NSEW)
+    except Exception as e:
+        print(f"Mac auto-check error: {e}")
 
 joinlabel.grid(column=1, row=0 ,sticky=NSEW)
 joinlabel2.grid(column=1, row=1 ,sticky=NSEW)

@@ -230,6 +230,7 @@ def login(): #login command.
             print("login successful")
             root.withdraw()
             main.deiconify()
+            refreshnet()
         logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
         ISLOG = True

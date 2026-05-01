@@ -79,7 +79,7 @@ namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
 
 SELF = {
-    "johnhuman233-github": "192.168.0.1"
+    "John's Macbook Air": "192.168.0.1"
 }
 
 for user, ip in SELF.items():
@@ -102,7 +102,7 @@ serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users', font=100)
+usertitlelabel = tk.Label(serverframe, text='Users Online', font=200)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
 DEVICES = {
@@ -114,14 +114,14 @@ DEVICES = {
     "phone-3": "1.1.1.1",
     }
 
-DEVICErow = 1
+USERrow = 1
 for user, ip in DEVICES.items():
     DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-    DEVICElabel.grid(column=1, row=DEVICErow, sticky="w")
+    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
 
     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-    IPDEVICElabel.grid(column=2, row=DEVICErow, sticky="w")
-    DEVICErow += 1
+    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+    USERrow += 1
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)

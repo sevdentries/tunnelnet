@@ -456,9 +456,8 @@ def refreshnet():
 
         USERrow = 1
         for user, ip in DEVICES.items():
+            global DEVICElabel
             if (user, ip) in SELF.items():
-                pass
-            elif DEVICElabel.cget("text") in DEVICES.items():
                 pass
             else:
                 DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
